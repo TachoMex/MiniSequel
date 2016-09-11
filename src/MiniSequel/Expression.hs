@@ -25,7 +25,7 @@ module MiniSequel.Expression where
     BitRightShift 
 
   data SequelStringOperator = Concat
-  data SequelSymbolOperator = Access
+  data SequelSymbolOperator = Access | As
 
   data SequelExpression = 
     SequelSymbol String | 
@@ -41,8 +41,6 @@ module MiniSequel.Expression where
     SequelNumericOperation SequelNumberOperator SequelExpression SequelExpression |
     SequelUnaryOperation String SequelExpression 
 
-
-
   data SequelBuiltInFunc = 
     Concatenate |
     Max |
@@ -50,7 +48,8 @@ module MiniSequel.Expression where
     Avg |
     Sum |
     Power |
-    Distinct
+    Distinct |
+    If
 
   infixr 0 ||.    -- Boolean or
   (||.) :: SequelExpression -> SequelExpression -> SequelExpression
@@ -149,16 +148,19 @@ module MiniSequel.Expression where
   (=:=) :: SequelExpression -> SequelExpression -> SequelExpression
   (=:=) a b = SequelFunctor Concatenate [a,b]
 
+  infix 0 =: -- AS operator
+  (=:) :: SequelExpression -> SequelExpression -> SequelExpression
+  (=:) a s@(SequelSymbol _) = SequelSymbolOperation As a s
 
   instance Show SequelExpression where
     show (SequelString s) = '\'':(escape_sql s) ++ "'" 
     show (SequelNumber n) = show n
     show (SequelSymbol s) = '`':(escape_sql s) ++ "`"
     show (SequelSymbolOperation s a b) = show a ++ show s ++ show b
-    show (SequelBoolOperation s a b) = show a ++ show s ++ show b
-    show (SequelStringOperation s a b) = show a ++ show s ++ show b
-    show (SequelNumericOperation s a b) = show a ++ show s ++ show b
-    show (SequelRelationalOperation s a b) = show a ++ show s ++ show b
+    show (SequelBoolOperation s a b) = "("++show a ++ show s ++ show b++")"
+    show (SequelStringOperation s a b) = "("++show a ++ show s ++ show b++")"
+    show (SequelNumericOperation s a b) = "("++show a ++ show s ++ show b++")"
+    show (SequelRelationalOperation s a b) = "("++show a ++ show s ++ show b++")"
 
   instance Show SequelNumberOperator where
     show Add = " + " 
@@ -186,9 +188,11 @@ module MiniSequel.Expression where
 
   instance Show SequelSymbolOperator where
     show Access = "." 
+    show As = " AS "
 
   instance Show SequelStringOperator where
-    show Concat = "CONCAT" 
+    show Concat = "CONCAT"
+
 
   apply_function construct op a@(SequelNumber _) b@(SequelNumericOperation _ _ _) = construct op a b
   apply_function construct op a@(SequelNumericOperation _ _ _) b@(SequelNumber _) = construct op a b
@@ -198,6 +202,7 @@ module MiniSequel.Expression where
   apply_function construct op a@(SequelStringOperation _ _ _) b@(SequelString _) = construct op a b
   apply_function construct op a@(SequelSymbolOperation _ _ _) b@(SequelSymbolOperation _ _ _) = construct op a b
   apply_function construct op a@(SequelSymbolOperation _ _ _) b@(SequelNumber _) = construct op a b
+  apply_function construct op a@(SequelSymbolOperation _ _ _) b@(SequelString _) = construct op a b
   apply_function construct op a@(SequelSymbol _) b@(SequelString _) = construct op a b 
   apply_function construct op a@(SequelSymbol _) b@(SequelNumber _) = construct op a b 
   apply_function _ op a b = error $ "Unknown operation for "++show op++" with:\n"++show a ++"\n"++ show b
