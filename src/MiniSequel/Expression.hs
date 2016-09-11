@@ -39,7 +39,8 @@ module MiniSequel.Expression where
     SequelStringOperation SequelStringOperator SequelExpression SequelExpression |
     SequelSymbolOperation SequelSymbolOperator SequelExpression SequelExpression |
     SequelNumericOperation SequelNumberOperator SequelExpression SequelExpression |
-    SequelUnaryOperation String SequelExpression 
+    SequelUnaryOperation String SequelExpression |
+    SequelNull
 
   data SequelBuiltInFunc = 
     Concatenate |
@@ -161,6 +162,7 @@ module MiniSequel.Expression where
     show (SequelStringOperation s a b) = "("++show a ++ show s ++ show b++")"
     show (SequelNumericOperation s a b) = "("++show a ++ show s ++ show b++")"
     show (SequelRelationalOperation s a b) = "("++show a ++ show s ++ show b++")"
+    show SequelNull = "NULL"
 
   instance Show SequelNumberOperator where
     show Add = " + " 
@@ -192,6 +194,10 @@ module MiniSequel.Expression where
 
   instance Show SequelStringOperator where
     show Concat = "CONCAT"
+
+
+  instance Show SequelBuiltInFunc where
+    show _ = "not implemented" 
 
 
   apply_function construct op a@(SequelNumber _) b@(SequelNumericOperation _ _ _) = construct op a b

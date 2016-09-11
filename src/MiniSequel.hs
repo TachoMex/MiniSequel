@@ -1,14 +1,14 @@
 {-# LANGUAGE DataKinds #-}
 module MiniSequel
 where
-  import Data.List
+  import Data.List (intercalate)
   import Data.Maybe
   import MiniSequel.Expression
   data SequelQuery = SequelQuery {
     _query_type :: SequelQueryType, 
     _colums :: Maybe [SequelExpression],
     _from :: SequelTable,
-    _values :: Maybe [SequelExpression],
+    _values :: Maybe [[SequelExpression]],
     _where :: Maybe SequelExpression,
     _order :: Maybe SequelOrder,
     _group :: Maybe [SequelColumn],
@@ -29,7 +29,7 @@ where
     show (Asc arr) = "ASC " ++ (intercalate "," $ map show arr)
 
   instance Show SequelColumn where
-    show (SequelColumn (SequelSymbol s)) = show s 
+    show (SequelColumn s@(SequelSymbol _)) = show s 
  
 
   from :: SequelExpression -> SequelQuery
@@ -44,7 +44,17 @@ where
     _having = Nothing
   }
 
-  test = 
+  test_select = 
+    select [users ~> nombre, edad, edad *. n 3 =: s"3_edades"] $ 
+    where' (users ~> nombre =. v"pony" &&. edad >=. n 18) $ 
+    from $ users
+    where 
+      users = s "users"
+      nombre = s "nombre"
+      edad = s "edad"
+      id = s "id"
+
+  test_update = 
     update [users ~> nombre =. v"tacho", edad =. n 22] $ 
     where' (users ~> nombre =. v"pony" &&. edad >=. n 18) $ 
     from $ users
@@ -53,6 +63,26 @@ where
       nombre = s "nombre"
       edad = s "edad"
       id = s "id"
+
+  test_insert = 
+    insert [id, nombre, edad] $
+    values [
+      [SequelNull, v"tacho", n 22],
+      [SequelNull, v"lily", n 21],
+      [SequelNull, v"bigui", n 22]
+      ] $
+    into users
+      where
+        users = s "users"
+        id = s "id"
+        nombre = s "nombre"
+        edad = s "edad"
+
+  test_delete =
+    delete $ 
+    where' (s"nombre" =. v"bigui") $
+    from (s "users")
+
 
 
   select :: [SequelExpression] -> SequelQuery -> SequelQuery
@@ -66,6 +96,19 @@ where
   update :: [SequelExpression] -> SequelQuery -> SequelQuery
   update fields query = 
     query {_query_type = UPDATE, _colums = (Just fields)}
+
+  insert :: [SequelExpression] -> SequelQuery -> SequelQuery
+  insert cols query = 
+    query {_query_type = INSERT, _colums = (Just cols)}
+
+  values ::[[SequelExpression]] -> SequelQuery -> SequelQuery
+  values vals query = 
+    query {_values = Just vals}
+
+  into = from 
+
+  delete :: SequelQuery -> SequelQuery 
+  delete query = query {_query_type = DELETE}
 
   show_cols Nothing = "*"
   show_cols (Just cols) = intercalate "," $ map show cols
@@ -85,6 +128,20 @@ where
     show s ++ " = " ++ show a 
   show_set (Just cols) = intercalate "," $ map show_single_set cols
 
+  show_insert_cols Nothing = ""
+  show_insert_cols (Just cols) = 
+    " (" ++ 
+      intercalate ", " (map (show.SequelColumn) cols) ++
+    ")"
+
+  show_vals (Just cols) = 
+    intercalate ", " $ 
+      map (\ row -> 
+        "(" ++ 
+        intercalate ", " (map show row) ++ 
+        ")"
+      )
+      cols
 
   show_query (SequelQuery SELECT cols table _ cond order_by group_by having) = 
     "SELECT " ++ 
@@ -102,6 +159,18 @@ where
     " SET " ++
     show_set cols ++
     show_cond cond 
+
+  show_query (SequelQuery INSERT cols table vals _ _ _ _) = 
+    "INSERT INTO " ++
+    show table ++ 
+    show_insert_cols cols ++
+    " VALUES " ++
+    show_vals vals
+
+  show_query (SequelQuery DELETE _ table _ cond _ _ _) = 
+    "DELETE FROM " ++
+    show table ++
+    show_cond cond
 
   instance Show SequelQuery where
     show = show_query  
