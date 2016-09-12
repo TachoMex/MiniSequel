@@ -1,5 +1,5 @@
 module MiniSequel.Expression where
-
+  import Data.List (intercalate)
   data SequelBooleanOperator = 
     BooleanOr | 
     BooleanAnd
@@ -43,14 +43,18 @@ module MiniSequel.Expression where
     SequelNull
 
   data SequelBuiltInFunc = 
-    Concatenate |
-    Max |
-    Min |
-    Avg |
-    Sum |
-    Power |
-    Distinct |
-    If
+    CONCATENATE |
+    MAX |
+    MIN |
+    AVG |
+    SUM |
+    POWER |
+    DISTINCT |
+    IF |
+    LENGTH |
+    YEAR |
+    MONTH | 
+    NOW deriving (Show)
 
   infixr 0 ||.    -- Boolean or
   (||.) :: SequelExpression -> SequelExpression -> SequelExpression
@@ -131,9 +135,9 @@ module MiniSequel.Expression where
 
   infixr 8 **.   -- exponentiation
   (**.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (**.) a@(SequelNumericOperation _ _ _) b@(SequelNumericOperation _ _ _) = SequelFunctor Power [a,b]
-  (**.) a@(SequelNumber _) b@(SequelNumericOperation _ _ _) = SequelFunctor Power [a,b]
-  (**.) a@(SequelNumericOperation _ _ _) b@(SequelNumber _) = SequelFunctor Power [a,b]
+  (**.) a@(SequelNumericOperation _ _ _) b@(SequelNumericOperation _ _ _) = SequelFunctor POWER [a,b]
+  (**.) a@(SequelNumber _) b@(SequelNumericOperation _ _ _) = SequelFunctor POWER [a,b]
+  (**.) a@(SequelNumericOperation _ _ _) b@(SequelNumber _) = SequelFunctor POWER [a,b]
   (**.) a b = error $ "Unknown operatrion for (**) with:\n"++show a ++"\n"++ show b
 
 
@@ -147,7 +151,7 @@ module MiniSequel.Expression where
 
   infixl 6 =:=   -- string concatenation
   (=:=) :: SequelExpression -> SequelExpression -> SequelExpression
-  (=:=) a b = SequelFunctor Concatenate [a,b]
+  (=:=) a b = SequelFunctor CONCATENATE [a,b]
 
   infix 0 =: -- AS operator
   (=:) :: SequelExpression -> SequelExpression -> SequelExpression
@@ -163,6 +167,11 @@ module MiniSequel.Expression where
     show (SequelNumericOperation s a b) = "("++show a ++ show s ++ show b++")"
     show (SequelRelationalOperation s a b) = "("++show a ++ show s ++ show b++")"
     show SequelNull = "NULL"
+    show (SequelFunctor func params) = 
+      show func ++ 
+      "(" ++ 
+      intercalate ", " (map show params) ++
+      ")"  
 
   instance Show SequelNumberOperator where
     show Add = " + " 
@@ -196,9 +205,6 @@ module MiniSequel.Expression where
     show Concat = "CONCAT"
 
 
-  instance Show SequelBuiltInFunc where
-    show _ = "not implemented" 
-
 
   apply_function construct op a@(SequelNumber _) b@(SequelNumericOperation _ _ _) = construct op a b
   apply_function construct op a@(SequelNumericOperation _ _ _) b@(SequelNumber _) = construct op a b
@@ -211,6 +217,10 @@ module MiniSequel.Expression where
   apply_function construct op a@(SequelSymbolOperation _ _ _) b@(SequelString _) = construct op a b
   apply_function construct op a@(SequelSymbol _) b@(SequelString _) = construct op a b 
   apply_function construct op a@(SequelSymbol _) b@(SequelNumber _) = construct op a b 
+  apply_function construct op a@(SequelFunctor _ _ ) b@(SequelString _) = construct op a b
+  apply_function construct op a@(SequelFunctor _ _ ) b@(SequelNumber _) = construct op a b
+  apply_function construct op a@(SequelFunctor _ _ ) b@(SequelSymbol _) = construct op a b
+  apply_function construct op a@(SequelFunctor _ _ ) b@(SequelNumericOperation _ _ _) = construct op a b
   apply_function _ op a b = error $ "Unknown operation for "++show op++" with:\n"++show a ++"\n"++ show b
 
 

@@ -10,15 +10,15 @@ where
     _from :: SequelTable,
     _values :: Maybe [[SequelExpression]],
     _where :: Maybe SequelExpression,
-    _order :: Maybe SequelOrder,
-    _group :: Maybe [SequelColumn],
+    _order :: Maybe [SequelOrder],
+    _group :: Maybe [SequelExpression],
     _having :: Maybe SequelExpression
   }
 
   data SequelColumn = SequelColumn SequelExpression
   data SequelQueryType = INSERT | DELETE | UPDATE | SELECT deriving (Show)
   data SequelTable = SequelTable String | SequelJoin SequelTable SequelTable SequelJoinType SequelExpression
-  data SequelOrder = Asc [SequelColumn] | Desc [SequelColumn]
+  data SequelOrder = Asc SequelExpression | Desc SequelExpression
   data SequelJoinType = INNER | LEFT | RIGHT deriving (Show)
 
   instance Show SequelTable where
@@ -26,7 +26,8 @@ where
     show (SequelJoin a b t expr) = show a ++ show " " ++ show t ++ " JOIN " ++ show b ++ show expr
 
   instance Show SequelOrder where
-    show (Asc arr) = "ASC " ++ (intercalate "," $ map show arr)
+    show (Asc exp) = show exp ++ " ASC"  
+    show (Desc exp) = show exp ++ " DESC"  
 
   instance Show SequelColumn where
     show (SequelColumn s@(SequelSymbol _)) = show s 
@@ -64,6 +65,17 @@ where
       edad = s "edad"
       id = s "id"
 
+  test_order = 
+    select [users ~> nombre, edad, edad *. n 3 =: s"3_edades"] $ 
+    where' (users ~> nombre =. v"pony" &&. edad >=. n 18) $ 
+    order_by [Asc (nombre), Desc (edad >=. n 18), Asc (f LENGTH [edad])] $
+    from users
+    where 
+      users = s "users"
+      nombre = s "nombre"
+      edad = s "edad"
+      id = s "id"
+
   test_insert = 
     insert [id, nombre, edad] $
     values [
@@ -82,6 +94,25 @@ where
     delete $ 
     where' (s"nombre" =. v"bigui") $
     from (s "users")
+
+  full_test = 
+    select [patente, pedimento, seccionaduanera, fraccion, f MAX [preciounitario] =: preciounitario] $
+    where' (f YEAR [fechapagoreal] >. v"2015-12-31") $
+    group_by [fraccion] $
+    order_by [Desc preciounitario] $
+    having (preciounitario >. n 10000) $
+    from _551 
+      where
+        _551 = s"_551"
+        patente = s"patente"
+        pedimento = s"pedimento"
+        seccionaduanera = s"seccionaduanera"
+        fraccion = s"fraccion"
+        preciounitario = s "preciounitario"
+        fechapagoreal = s "fechapagoreal"
+
+
+
 
 
 
@@ -110,6 +141,18 @@ where
   delete :: SequelQuery -> SequelQuery 
   delete query = query {_query_type = DELETE}
 
+  order_by :: [SequelOrder] -> SequelQuery -> SequelQuery
+  order_by criteria query = 
+    query {_order = Just criteria}
+
+  group_by :: [SequelExpression] -> SequelQuery -> SequelQuery
+  group_by criteria query = 
+    query {_group = Just criteria}
+
+  having :: SequelExpression -> SequelQuery -> SequelQuery
+  having cond query = 
+    query {_having = Just cond}
+
   show_cols Nothing = "*"
   show_cols (Just cols) = intercalate "," $ map show cols
 
@@ -117,10 +160,13 @@ where
   show_cond (Just cond) = " WHERE " ++ show cond
 
   show_order Nothing = ""
+  show_order (Just criteria) = " ORDER BY " ++ intercalate ", "  (fmap show criteria)
 
   show_group Nothing = ""
+  show_group (Just criteria) = " GROUP BY " ++ intercalate ", " (fmap show criteria)
 
   show_having Nothing = ""
+  show_having (Just cond) = " HAVING " ++ show cond
 
   show_single_set (SequelRelationalOperation Equal s@(SequelSymbol _) a) = 
     show s ++ " = " ++ show a 
@@ -143,13 +189,13 @@ where
       )
       cols
 
-  show_query (SequelQuery SELECT cols table _ cond order_by group_by having) = 
+  show_query (SequelQuery SELECT cols table _ cond order group_by having) = 
     "SELECT " ++ 
     show_cols cols ++
     " FROM " ++ 
     show table ++ 
     show_cond cond ++ 
-    show_order order_by ++ 
+    show_order order ++ 
     show_group group_by ++
     show_having having
 
