@@ -17,13 +17,16 @@ where
 
   data SequelColumn = SequelColumn SequelExpression
   data SequelQueryType = INSERT | DELETE | UPDATE | SELECT deriving (Show)
-  data SequelTable = SequelTable String | SequelJoin SequelTable SequelTable SequelJoinType SequelExpression
+  data SequelTable = 
+    SequelTable (SequelExpression) | 
+    SequelJoin SequelTable SequelTable SequelJoinType SequelExpression 
   data SequelOrder = Asc SequelExpression | Desc SequelExpression
   data SequelJoinType = INNER | LEFT | RIGHT deriving (Show)
 
+
   instance Show SequelTable where
-    show (SequelTable s) = s
-    show (SequelJoin a b t expr) = show a ++ show " " ++ show t ++ " JOIN " ++ show b ++ show expr
+    show (SequelTable s) = show s
+    show (SequelJoin a b t expr) = "(" ++ show a ++ " " ++ show t ++ " JOIN " ++ show b ++ " ON " ++show expr ++ ")"
 
   instance Show SequelOrder where
     show (Asc exp) = show exp ++ " ASC"  
@@ -33,88 +36,17 @@ where
     show (SequelColumn s@(SequelSymbol _)) = show s 
  
 
-  from :: SequelExpression -> SequelQuery
-  from table@(SequelSymbol _) = SequelQuery {
+  from :: SequelTable -> SequelQuery
+  from table = SequelQuery {
     _query_type = SELECT, 
     _colums = Nothing,
-    _from = SequelTable $ show table, 
+    _from = table, 
     _values = Nothing,
     _where = Nothing, 
     _order = Nothing, 
     _group = Nothing, 
     _having = Nothing
   }
-
-  test_select = 
-    select [users ~> nombre, edad, edad *. n 3 =: s"3_edades"] $ 
-    where' (users ~> nombre =. v"pony" &&. edad >=. n 18) $ 
-    from $ users
-    where 
-      users = s "users"
-      nombre = s "nombre"
-      edad = s "edad"
-      id = s "id"
-
-  test_update = 
-    update [users ~> nombre =. v"tacho", edad =. n 22] $ 
-    where' (users ~> nombre =. v"pony" &&. edad >=. n 18) $ 
-    from $ users
-    where 
-      users = s "users"
-      nombre = s "nombre"
-      edad = s "edad"
-      id = s "id"
-
-  test_order = 
-    select [users ~> nombre, edad, edad *. n 3 =: s"3_edades"] $ 
-    where' (users ~> nombre =. v"pony" &&. edad >=. n 18) $ 
-    order_by [Asc (nombre), Desc (edad >=. n 18), Asc (f LENGTH [edad])] $
-    from users
-    where 
-      users = s "users"
-      nombre = s "nombre"
-      edad = s "edad"
-      id = s "id"
-
-  test_insert = 
-    insert [id, nombre, edad] $
-    values [
-      [SequelNull, v"tacho", n 22],
-      [SequelNull, v"lily", n 21],
-      [SequelNull, v"bigui", n 22]
-      ] $
-    into users
-      where
-        users = s "users"
-        id = s "id"
-        nombre = s "nombre"
-        edad = s "edad"
-
-  test_delete =
-    delete $ 
-    where' (s"nombre" =. v"bigui") $
-    from (s "users")
-
-  full_test = 
-    select [patente, pedimento, seccionaduanera, fraccion, f MAX [preciounitario] =: preciounitario] $
-    where' (f YEAR [fechapagoreal] >. v"2015-12-31") $
-    group_by [fraccion] $
-    order_by [Desc preciounitario] $
-    having (preciounitario >. n 10000) $
-    from _551 
-      where
-        _551 = s"_551"
-        patente = s"patente"
-        pedimento = s"pedimento"
-        seccionaduanera = s"seccionaduanera"
-        fraccion = s"fraccion"
-        preciounitario = s "preciounitario"
-        fechapagoreal = s "fechapagoreal"
-
-
-
-
-
 
   select :: [SequelExpression] -> SequelQuery -> SequelQuery
   select fields query = 
@@ -152,6 +84,15 @@ where
   having :: SequelExpression -> SequelQuery -> SequelQuery
   having cond query = 
     query {_having = Just cond}
+
+  inner_join :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
+  inner_join a b cond = SequelJoin a b INNER cond
+
+  right_join :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
+  right_join a b cond = SequelJoin a b RIGHT cond
+
+  left_join :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
+  left_join a b cond = SequelJoin a b LEFT cond
 
   show_cols Nothing = "*"
   show_cols (Just cols) = intercalate "," $ map show cols
@@ -221,4 +162,5 @@ where
   instance Show SequelQuery where
     show = show_query  
 
-
+  t s@(SequelSymbol _) = SequelTable s
+  ts = SequelTable . SequelSymbol

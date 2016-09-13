@@ -212,7 +212,9 @@ module MiniSequel.Expression where
   apply_function construct op a@(SequelString _) b@(SequelString _) = construct op a b
   apply_function construct op a@(SequelString _) b@(SequelStringOperation _ _ _) = construct op a b
   apply_function construct op a@(SequelStringOperation _ _ _) b@(SequelString _) = construct op a b
+  apply_function construct op a@(SequelStringOperation _ _ _) b@(SequelSymbol _) = construct op a b
   apply_function construct op a@(SequelSymbolOperation _ _ _) b@(SequelSymbolOperation _ _ _) = construct op a b
+  apply_function construct op a@(SequelSymbolOperation _ _ _) b@(SequelSymbol _) = construct op a b
   apply_function construct op a@(SequelSymbolOperation _ _ _) b@(SequelNumber _) = construct op a b
   apply_function construct op a@(SequelSymbolOperation _ _ _) b@(SequelString _) = construct op a b
   apply_function construct op a@(SequelSymbol _) b@(SequelString _) = construct op a b 
