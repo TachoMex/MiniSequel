@@ -1,5 +1,7 @@
 import MiniSequel
 import MiniSequel.Expression
+import MiniSequel.Model
+
 test_select = 
   select [users ~> nombre, edad, edad *. n 3 =: s"3_edades"] $ 
   where' (users ~> nombre =. v"pony" &&. edad >=. n 18) $ 
@@ -96,3 +98,22 @@ test_join =
     id_usuario = s "id_usuario"
     id = s "id" 
 
+data Loan = Loan {
+  loan_id :: String,
+  user_id :: String, 
+  status :: String,
+  application_date :: String, 
+  amount :: Maybe Double, 
+  interests :: Maybe Double, 
+  days :: Maybe Int
+} 
+
+instance SequelModel Loan where
+  create_model _ = table (s"loans") [
+    not_null $ primary_key $ auto_increment $ column (s"loan_id") SequelInteger,
+    not_null $ column  (s"user_id") (SequelVarchar 30),
+    not_null $ default' (v"pending") $ column (s"status") (SequelVarchar 30),
+    not_null $ column (s"application_date") SequelDateTime,
+    column (s"amount") SequelDouble,
+    column (s"interests") SequelDouble,
+    column (s"days") SequelInteger]

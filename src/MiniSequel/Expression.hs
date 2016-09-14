@@ -40,7 +40,8 @@ module MiniSequel.Expression where
     SequelSymbolOperation SequelSymbolOperator SequelExpression SequelExpression |
     SequelNumericOperation SequelNumberOperator SequelExpression SequelExpression |
     SequelUnaryOperation String SequelExpression |
-    SequelNull
+    SequelNull |
+    CurrentTimeStamp
 
   data SequelBuiltInFunc = 
     CONCATENATE |
@@ -167,6 +168,7 @@ module MiniSequel.Expression where
     show (SequelNumericOperation s a b) = "("++show a ++ show s ++ show b++")"
     show (SequelRelationalOperation s a b) = "("++show a ++ show s ++ show b++")"
     show SequelNull = "NULL"
+    show CurrentTimeStamp = "CURRENT_TIMESTAMP"
     show (SequelFunctor func params) = 
       show func ++ 
       "(" ++ 

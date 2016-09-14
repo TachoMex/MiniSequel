@@ -194,3 +194,5 @@ where
   n = SequelNumber
   v = SequelString  
   f = SequelFunctor
+  now = f NOW []
+  current_timestamp = CurrentTimeStamp
