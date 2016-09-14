@@ -12,7 +12,8 @@ where
     _where :: Maybe SequelExpression,
     _order :: Maybe [SequelOrder],
     _group :: Maybe [SequelExpression],
-    _having :: Maybe SequelExpression
+    _having :: Maybe SequelExpression,
+    _limit :: Maybe (Int, Int)
   }
 
   data SequelColumn = SequelColumn SequelExpression
@@ -45,7 +46,8 @@ where
     _where = Nothing, 
     _order = Nothing, 
     _group = Nothing, 
-    _having = Nothing
+    _having = Nothing,
+    _limit = Nothing
   }
 
   select :: [SequelExpression] -> SequelQuery -> SequelQuery
@@ -94,6 +96,20 @@ where
   left_join :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
   left_join a b cond = SequelJoin a b LEFT cond
 
+  limit :: Int -> SequelQuery -> SequelQuery
+  limit lim query 
+    | isNothing $ _limit query = query { _limit = Just (lim, 0) }
+    | otherwise = query { _limit = Just (lim, offset') } 
+      where (_, offset') = fromJust $ _limit query
+
+  offset :: Int -> SequelQuery -> SequelQuery
+  offset offset' query 
+    | isNothing $ _limit query = query { _limit = Just (1, offset')}
+    | otherwise = query { _limit = Just (lim, offset') }
+      where (lim, _) = fromJust $ _limit query
+  first :: SequelQuery -> SequelQuery
+  first = limit 1
+
   show_cols Nothing = "*"
   show_cols (Just cols) = intercalate "," $ map show cols
 
@@ -121,6 +137,13 @@ where
       intercalate ", " (map (show.SequelColumn) cols) ++
     ")"
 
+  show_limit Nothing = ""
+  show_limit (Just (a,0)) = " LIMIT " ++ show a
+  show_limit (Just (a,b)) = " LIMIT " ++ show a ++ " OFFSET " ++ show b
+
+  show_simple_limit Nothing = ""
+  show_simple_limit (Just (a, _)) = " LIMIT " ++ show a
+
   show_vals (Just cols) = 
     intercalate ", " $ 
       map (\ row -> 
@@ -130,7 +153,7 @@ where
       )
       cols
 
-  show_query (SequelQuery SELECT cols table _ cond order group_by having) = 
+  show_query (SequelQuery SELECT cols table _ cond order group_by having lim) = 
     "SELECT " ++ 
     show_cols cols ++
     " FROM " ++ 
@@ -138,29 +161,36 @@ where
     show_cond cond ++ 
     show_order order ++ 
     show_group group_by ++
-    show_having having
+    show_having having ++
+    show_limit lim
 
-  show_query (SequelQuery UPDATE cols table _ cond _ _ _) =
+  show_query (SequelQuery UPDATE cols table _ cond _ _ _ lim) =
     "UPDATE " ++
     show table ++
     " SET " ++
     show_set cols ++
-    show_cond cond 
+    show_cond cond ++
+    show_simple_limit lim
 
-  show_query (SequelQuery INSERT cols table vals _ _ _ _) = 
+  show_query (SequelQuery INSERT cols table vals _ _ _ _ _) = 
     "INSERT INTO " ++
     show table ++ 
     show_insert_cols cols ++
     " VALUES " ++
     show_vals vals
 
-  show_query (SequelQuery DELETE _ table _ cond _ _ _) = 
+  show_query (SequelQuery DELETE _ table _ cond _ _ _ lim) = 
     "DELETE FROM " ++
     show table ++
-    show_cond cond
+    show_cond cond ++
+    show_simple_limit lim
 
   instance Show SequelQuery where
     show = show_query  
 
   t s@(SequelSymbol _) = SequelTable s
   ts = SequelTable . SequelSymbol
+  s = SequelSymbol
+  n = SequelNumber
+  v = SequelString  
+  f = SequelFunctor

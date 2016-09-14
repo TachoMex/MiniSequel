@@ -205,25 +205,17 @@ module MiniSequel.Expression where
     show Concat = "CONCAT"
 
 
+  is_value (SequelNumber _) = True  
+  is_value (SequelNumericOperation _ _ _) = True
+  is_value (SequelString _ ) = True
+  is_value (SequelStringOperation _ _ _) = True
+  is_value (SequelSymbol _) = True
+  is_value (SequelSymbolOperation _ _ _) = True
+  is_value (SequelFunctor _ _) = True
 
-  apply_function construct op a@(SequelNumber _) b@(SequelNumericOperation _ _ _) = construct op a b
-  apply_function construct op a@(SequelNumericOperation _ _ _) b@(SequelNumber _) = construct op a b
-  apply_function construct op a@(SequelNumericOperation _ _ _) b@(SequelNumericOperation _ _ _) = construct op a b
-  apply_function construct op a@(SequelString _) b@(SequelString _) = construct op a b
-  apply_function construct op a@(SequelString _) b@(SequelStringOperation _ _ _) = construct op a b
-  apply_function construct op a@(SequelStringOperation _ _ _) b@(SequelString _) = construct op a b
-  apply_function construct op a@(SequelStringOperation _ _ _) b@(SequelSymbol _) = construct op a b
-  apply_function construct op a@(SequelSymbolOperation _ _ _) b@(SequelSymbolOperation _ _ _) = construct op a b
-  apply_function construct op a@(SequelSymbolOperation _ _ _) b@(SequelSymbol _) = construct op a b
-  apply_function construct op a@(SequelSymbolOperation _ _ _) b@(SequelNumber _) = construct op a b
-  apply_function construct op a@(SequelSymbolOperation _ _ _) b@(SequelString _) = construct op a b
-  apply_function construct op a@(SequelSymbol _) b@(SequelString _) = construct op a b 
-  apply_function construct op a@(SequelSymbol _) b@(SequelNumber _) = construct op a b 
-  apply_function construct op a@(SequelFunctor _ _ ) b@(SequelString _) = construct op a b
-  apply_function construct op a@(SequelFunctor _ _ ) b@(SequelNumber _) = construct op a b
-  apply_function construct op a@(SequelFunctor _ _ ) b@(SequelSymbol _) = construct op a b
-  apply_function construct op a@(SequelFunctor _ _ ) b@(SequelNumericOperation _ _ _) = construct op a b
-  apply_function _ op a b = error $ "Unknown operation for "++show op++" with:\n"++show a ++"\n"++ show b
+  apply_function construct op a b  
+    | is_value a && is_value b = construct op a b
+    | otherwise = error $ "Unknown operation for "++show op++" with:\n"++show a ++"\n"++ show b
 
 
 
@@ -243,10 +235,7 @@ module MiniSequel.Expression where
   escape_sql :: String -> String
   escape_sql x = x
 
-  s = SequelSymbol
-  n = SequelNumber
-  v = SequelString  
-  f = SequelFunctor
+
 
 
 --  s"table" ~> s"attemps"  >=. n 3 &&. s "loan_id" =. v "123123" &&. s "salario" *. n 3 <>. n 10000 
