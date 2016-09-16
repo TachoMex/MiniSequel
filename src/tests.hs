@@ -109,7 +109,7 @@ data Loan = Loan {
 } 
 
 instance SequelModel Loan where
-  create_model _ = table (s"loans") [
+  create_model = table (s"loans") [
     not_null $ primary_key $ auto_increment $ column (s"loan_id") SequelInteger,
     not_null $ column  (s"user_id") (SequelVarchar 30),
     not_null $ default' (v"pending") $ column (s"status") (SequelVarchar 30),

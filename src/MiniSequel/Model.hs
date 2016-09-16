@@ -4,7 +4,8 @@ where
   import Data.List (intercalate)
 
   class SequelModel a where
-    create_model :: a -> Model 
+    create_model :: Model a
+
 
   data SequelType = 
     SequelInteger |
@@ -23,7 +24,7 @@ where
     _auto_increment :: Bool
   }
 
-  data Model = Model{
+  data Model a = Model{
     _name' :: SequelExpression, 
     _columns :: [SequelField]
   } 
@@ -75,7 +76,7 @@ where
     show SequelDouble = "DOUBLE"
 
 
-  instance Show Model where
+  instance Show (Model a) where
     show (Model name@(SequelSymbol _) fields) = 
       "CREATE TABLE " ++ 
       show name ++ 
