@@ -1,6 +1,8 @@
 import MiniSequel
 import MiniSequel.Expression
 import MiniSequel.Model
+import MiniSequel.Adapters.Adapter
+import Database.HDBC.MySQL
 
 test_select = 
   select [users ~> nombre, edad, edad *. n 3 =: s"3_edades"] $ 
@@ -117,3 +119,14 @@ instance SequelModel Loan where
     column (s"amount") SequelDouble,
     column (s"interests") SequelDouble,
     column (s"days") SequelInteger]
+
+test_connection pass=  connectMySQL defaultMySQLConnectInfo {
+  mysqlHost = "127.0.0.1",
+  mysqlUser = "root",
+  mysqlPassword = pass, 
+  mysqlPort = 3306, 
+  mysqlDatabase = "haskellSequel" 
+}
+
+create_models conn = do
+  take_model conn $ if_not_exists $ (create_model :: Model Loan)

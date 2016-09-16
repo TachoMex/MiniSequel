@@ -7,6 +7,7 @@ where
     create_model :: Model a
 
 
+
   data SequelType = 
     SequelInteger |
     SequelVarchar Int | 
@@ -26,10 +27,13 @@ where
 
   data Model a = Model{
     _name' :: SequelExpression, 
-    _columns :: [SequelField]
+    _columns :: [SequelField],
+    _safe_creation :: Bool
   } 
 
-  table name cols = Model { _name' = name, _columns = cols}
+  if_not_exists m = m { _safe_creation = True}
+
+  table name cols = Model { _name' = name, _columns = cols, _safe_creation = False}
 
   column :: SequelExpression -> SequelType -> SequelField
   column name@(SequelSymbol _) type' = SequelField {
@@ -77,8 +81,9 @@ where
 
 
   instance Show (Model a) where
-    show (Model name@(SequelSymbol _) fields) = 
+    show (Model name@(SequelSymbol _) fields safe) = 
       "CREATE TABLE " ++ 
+      (if safe then " IF NOT EXISTS " else "") ++
       show name ++ 
       "(" ++
       show_fields fields ++
