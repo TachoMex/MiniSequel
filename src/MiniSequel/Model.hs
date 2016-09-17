@@ -9,6 +9,7 @@ where
 
 
   data SequelType = 
+    SequelBoolean |
     SequelInteger |
     SequelVarchar Int | 
     SequelDate |
@@ -22,7 +23,8 @@ where
     _default :: Maybe SequelExpression,
     _null :: Bool,
     _primary_key :: Bool,
-    _auto_increment :: Bool
+    _auto_increment :: Bool,
+    _unique :: Bool
   }
 
   data Model a = Model{
@@ -42,7 +44,8 @@ where
       _default = Nothing,
       _null = True,
       _primary_key = False,
-      _auto_increment = False
+      _auto_increment = False,
+      _unique = False
     }
 
   not_null :: SequelField -> SequelField
@@ -56,6 +59,9 @@ where
 
   default' :: SequelExpression -> SequelField -> SequelField
   default' value field = field { _default = Just value}
+
+  unique ::SequelField -> SequelField
+  unique field = field { _unique = True }
 
   show_null True = " NULL "
   show_null False = " NOT NULL "
@@ -78,6 +84,7 @@ where
     show SequelDateTime = "DATETIME"
     show SequelTime = "TIME"
     show SequelDouble = "DOUBLE"
+    show SequelBoolean = " BOOLEAN"
 
 
   instance Show (Model a) where
@@ -90,11 +97,12 @@ where
       ")"
 
   instance Show SequelField where
-    show (SequelField t name def nul pk ai) =
+    show (SequelField t name def nul pk ai uni) =
       show name ++ 
       " " ++ 
       show t ++ 
       show_null nul ++
       show_default def ++ 
       show_auto_increment ai ++ 
-      show_primary_key pk  
+      show_primary_key pk ++
+      if uni then (" UNIQUE ") else ""
