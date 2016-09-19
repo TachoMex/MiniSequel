@@ -1,5 +1,8 @@
-module MiniSequel.Mapper 
+module MiniSequel.Mapper
 where
+  import MiniSequel
   import Database.HDBC
   class SequelMapper a where
-    fromQuery :: [SqlValue] -> a
+    from_sql_row :: [SqlValue] -> a
+    store :: a -> SequelQuery
+    update :: a -> SequelQuery

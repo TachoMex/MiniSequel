@@ -1,34 +1,34 @@
 module MiniSequel.Expression where
   import Data.List (intercalate)
-  data SequelBooleanOperator = 
-    BooleanOr | 
+  data SequelBooleanOperator =
+    BooleanOr |
     BooleanAnd
-    
+
   data SequelRelationalOperator =
     Less |
     LessEq |
     Greater |
     GreaterEq |
     Equal |
-    Different 
+    Different
 
-  data SequelNumberOperator = 
-    Add | 
-    Substract | 
-    Multiply | 
+  data SequelNumberOperator =
+    Add |
+    Substract |
+    Multiply |
     Divide |
-    Modulus | 
-    BitOr | 
-    BitAnd | 
-    BitXor | 
+    Modulus |
+    BitOr |
+    BitAnd |
+    BitXor |
     BitLeftShift |
-    BitRightShift 
+    BitRightShift
 
   data SequelStringOperator = Concat
   data SequelSymbolOperator = Access | As
 
-  data SequelExpression = 
-    SequelSymbol String | 
+  data SequelExpression =
+    SequelSymbol String |
     SequelString String |
     SequelNumber Double |
     SequelNumList [Double] |
@@ -43,7 +43,7 @@ module MiniSequel.Expression where
     SequelNull |
     CurrentTimeStamp
 
-  data SequelBuiltInFunc = 
+  data SequelBuiltInFunc =
     CONCATENATE |
     MAX |
     MIN |
@@ -54,7 +54,7 @@ module MiniSequel.Expression where
     IF |
     LENGTH |
     YEAR |
-    MONTH | 
+    MONTH |
     NOW deriving (Show)
 
   infixr 0 ||.    -- Boolean or
@@ -77,7 +77,7 @@ module MiniSequel.Expression where
   infixr 3 &.     -- bitwsie and
   (&.) :: SequelExpression -> SequelExpression -> SequelExpression
   (&.) = apply_numeric_functor BitAnd
-  
+
   infix 4 =.     -- comparison
   (=.) :: SequelExpression -> SequelExpression -> SequelExpression
   (=.) = apply_relational_functor Equal
@@ -96,7 +96,7 @@ module MiniSequel.Expression where
   (<=.) = apply_relational_functor LessEq
 
 
-  infix 4 >.     -- greater 
+  infix 4 >.     -- greater
   (>.) :: SequelExpression -> SequelExpression -> SequelExpression
   (>.) = apply_relational_functor Greater
 
@@ -159,7 +159,7 @@ module MiniSequel.Expression where
   (=:) a s@(SequelSymbol _) = SequelSymbolOperation As a s
 
   instance Show SequelExpression where
-    show (SequelString s) = '\'':(escape_sql s) ++ "'" 
+    show (SequelString s) = '\'':(escape_sql s) ++ "'"
     show (SequelNumber n) = show n
     show (SequelSymbol s) = '`':(escape_sql s) ++ "`"
     show (SequelSymbolOperation s a b) = show a ++ show s ++ show b
@@ -169,27 +169,27 @@ module MiniSequel.Expression where
     show (SequelRelationalOperation s a b) = "("++show a ++ show s ++ show b++")"
     show SequelNull = "NULL"
     show CurrentTimeStamp = "CURRENT_TIMESTAMP"
-    show (SequelFunctor func params) = 
-      show func ++ 
-      "(" ++ 
+    show (SequelFunctor func params) =
+      show func ++
+      "(" ++
       intercalate ", " (map show params) ++
-      ")"  
+      ")"
 
   instance Show SequelNumberOperator where
-    show Add = " + " 
-    show Substract = " - " 
-    show Multiply = " * " 
+    show Add = " + "
+    show Substract = " - "
+    show Multiply = " * "
     show Divide = " / "
-    show Modulus = " % " 
-    show BitOr = " | " 
-    show BitAnd = " & " 
-    show BitXor = " ^ " 
+    show Modulus = " % "
+    show BitOr = " | "
+    show BitAnd = " & "
+    show BitXor = " ^ "
     show BitLeftShift = " << "
     show BitRightShift = " >> "
-    
+
   instance Show SequelBooleanOperator where
-    show BooleanOr = " OR " 
-    show BooleanAnd = " AND " 
+    show BooleanOr = " OR "
+    show BooleanAnd = " AND "
 
   instance Show SequelRelationalOperator where
     show Less = " < "
@@ -197,17 +197,17 @@ module MiniSequel.Expression where
     show Greater = " > "
     show GreaterEq = " >= "
     show Equal = " = "
-    show Different = " <> " 
+    show Different = " <> "
 
   instance Show SequelSymbolOperator where
-    show Access = "." 
+    show Access = "."
     show As = " AS "
 
   instance Show SequelStringOperator where
     show Concat = "CONCAT"
 
 
-  is_value (SequelNumber _) = True  
+  is_value (SequelNumber _) = True
   is_value (SequelNumericOperation _ _ _) = True
   is_value (SequelString _ ) = True
   is_value (SequelStringOperation _ _ _) = True
@@ -215,7 +215,7 @@ module MiniSequel.Expression where
   is_value (SequelSymbolOperation _ _ _) = True
   is_value (SequelFunctor _ _) = True
 
-  apply_function construct op a b  
+  apply_function construct op a b
     | is_value a && is_value b = construct op a b
     | otherwise = error $ "Unknown operation for "++show op++" with:\n"++show a ++"\n"++ show b
 
@@ -240,5 +240,5 @@ module MiniSequel.Expression where
 
 
 
---  s"table" ~> s"attemps"  >=. n 3 &&. s "loan_id" =. v "123123" &&. s "salario" *. n 3 <>. n 10000 
+--  s"table" ~> s"attemps"  >=. n 3 &&. s "loan_id" =. v "123123" &&. s "salario" *. n 3 <>. n 10000
 --  x >= 3 and loan_id = '123123' and salario*3 != 100000
