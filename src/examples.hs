@@ -1,4 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric, FlexibleContexts #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+
+import qualified GHC.Generics as G
+import qualified Generics.SOP as SOP
+import Data.Data
+import Data.Typeable
 import MiniSequel
 import MiniSequel.Expression
 import MiniSequel.Model
@@ -10,8 +17,8 @@ import Database.HDBC.Types
 import Database.HDBC
 
 sample_select =
-  select [users ~> name, age, age *. n 3 =: s"3_ages"] $
-  where' (users ~> name =. v"somebody" &&. age >=. n 18) $
+  select [users ~> name, age, age *. ni 3 =: s"3_ages"] $
+  where' (users ~> name =. v"somebody" &&. age >=. ni 18) $
   from $ t users
   where
     users = s "users"
@@ -20,8 +27,8 @@ sample_select =
     id = s "id"
 
 sample_update =
-  update [users ~> name =. v"tacho", age =. n 22] $
-  where' (users ~> name =. v"somebody" &&. age >=. n 18) $
+  update [users ~> name =. v"tacho", age =. ni 22] $
+  where' (users ~> name =. v"somebody" &&. age >=. ni 18) $
   from $ t users
   where
     users = s "users"
@@ -30,9 +37,9 @@ sample_update =
     id = s "id"
 
 sample_order =
-  select [users ~> name, age, age *. n 3 =: s"3_agees"] $
-  where' (users ~> name =. v"somebody" &&. age >=. n 18) $
-  order_by [Asc (name), Desc (age >=. n 18), Asc (f LENGTH [age])] $
+  select [users ~> name, age, age *. ni 3 =: s"3_agees"] $
+  where' (users ~> name =. v"somebody" &&. age >=. ni 18) $
+  order_by [Asc (name), Desc (age >=. ni 18), Asc (f LENGTH [age])] $
   from $ t users
   where
     users = s "users"
@@ -43,9 +50,9 @@ sample_order =
 sample_insert =
   insert [id, name, age] $
   values [
-    [SequelNull, v"alice", n 22],
-    [SequelNull, v"bob", n 21],
-    [SequelNull, v"cheryl", n 22]
+    [SequelNull, v"alice", ni 22],
+    [SequelNull, v"bob", ni 21],
+    [SequelNull, v"cheryl", ni 22]
     ] $
   into $ t users
     where
@@ -64,7 +71,7 @@ full_test =
   where' (f YEAR [register_date] >. v"2015-12-31") $
   group_by [name] $
   order_by [Desc salary] $
-  having (salary >. n 10000) $
+  having (salary >. ni 10000) $
   from $ t employee
     where
       name          = s"name"
@@ -76,15 +83,20 @@ full_test =
 
 sample_join = ""
 
-data User = User {
+data UserModel = UserModel {
   user_id :: Int,
   name :: ByteString,
   username :: ByteString,
   email :: ByteString,
   password :: ByteString
-} deriving (Show)
+} deriving (Show
+          , Typeable
+          , G.Generic
+          , Data)
 
-instance SequelModel User where
+instance  SOP.Generic UserModel
+
+instance SequelModel UserModel where
   create_model = table (s"user") [
     primary_key $ auto_increment $ not_null $ column (s"user_id")        SequelInteger,
                                    not_null $ column (s"name")          (SequelVarchar 50),
@@ -92,30 +104,21 @@ instance SequelModel User where
                                    not_null $ column (s"email")         (SequelVarchar 60),
                                    not_null $ column (s"password")      (SequelVarchar 1050)]
 
-instance SequelMapper User where
-  from_sql_row [
-    SqlInt32 uid',
-    SqlByteString name',
-    SqlByteString user',
-    SqlByteString mail',
-    SqlByteString pass] = User {
-      user_id = fromIntegral uid',
-      name = name',
-      username = user',
-      email = mail',
-      password = pass
+instance SequelMapper UserModel where
+  from_sql_row row = UserModel {
+      user_id = fromSql $ row !! 0,
+      name = fromSql $ row !! 1,
+      username = fromSql $ row !! 2,
+      email = fromSql $ row !! 3,
+      password = fromSql $ row !! 4
     }
 
-  create (User id' name' user mail pass) =
-    insert [ s"user_id", s"name", s"username", s"email", s"password"] $
-    values [[SequelNull, v $ unpack name', v $unpack user,v$ unpack mail, v$ unpack pass]] $
-    into $ ts "user"
 
-find_by_username :: (IConnection a) => a -> String -> IO User
+find_by_username :: (IConnection a) => a -> String -> IO UserModel
 find_by_username con user = do
   let query = first $ where' (s"username" =. v user) $ from $ ts "user"
   result <- exec con query
-  return $ from_sql_row $ head result :: IO User
+  return $ from_sql_row $ head result :: IO UserModel
 
 main = do
   print sample_select
@@ -125,10 +128,13 @@ main = do
   print sample_delete
   print full_test
   print sample_join
-  print (create_model :: Model User)
+  print (create_model :: Model UserModel)
   print $ create you
+  print $ create_multi [you, you, you]
+  print $ store you
+  print $ (from_sql_row [SqlInt32 10, SqlByteString "ImAUser", SqlByteString "ProUser", SqlByteString "mail@mail.com", SqlByteString "p4ssvv0rd"] :: UserModel)
   where
-    you = User {
+    you = UserModel {
       user_id = 8,
       name = "tacho",
       username = "tacho",
