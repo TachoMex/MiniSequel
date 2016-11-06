@@ -1,5 +1,6 @@
 module MiniSequel.Expression where
   import Data.List (intercalate)
+
   data SequelBooleanOperator =
     BooleanOr |
     BooleanAnd
@@ -31,6 +32,7 @@ module MiniSequel.Expression where
     SequelSymbol String |
     SequelString String |
     SequelNumber Double |
+    SequelIntegral Int |
     SequelNumList [Double] |
     SquelStringList [String] |
     SequelFunctor SequelBuiltInFunc [SequelExpression] |
@@ -159,9 +161,10 @@ module MiniSequel.Expression where
   (=:) a s@(SequelSymbol _) = SequelSymbolOperation As a s
 
   instance Show SequelExpression where
-    show (SequelString s) = '\'':(escape_sql s) ++ "'"
+    show (SequelString s) = s
     show (SequelNumber n) = show n
-    show (SequelSymbol s) = '`':(escape_sql s) ++ "`"
+    show (SequelIntegral i) = show i
+    show (SequelSymbol s) = '`':s ++ "`"
     show (SequelSymbolOperation s a b) = show a ++ show s ++ show b
     show (SequelBoolOperation s a b) = "("++show a ++ show s ++ show b++")"
     show (SequelStringOperation s a b) = "("++show a ++ show s ++ show b++")"
@@ -208,6 +211,7 @@ module MiniSequel.Expression where
 
 
   is_value (SequelNumber _) = True
+  is_value (SequelIntegral _) = True
   is_value (SequelNumericOperation _ _ _) = True
   is_value (SequelString _ ) = True
   is_value (SequelStringOperation _ _ _) = True
@@ -234,8 +238,6 @@ module MiniSequel.Expression where
   appy_boolean_functor op a@(SequelBoolOperation _ _ _) b@(SequelBoolOperation _ _ _) = SequelBoolOperation op a b
   appy_boolean_functor op a b = error $ "Unknown operation for "++show op++" with:\n"++show a ++"\n"++ show b
 
-  escape_sql :: String -> String
-  escape_sql x = x
 
 
 

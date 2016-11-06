@@ -1,25 +1,28 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module MiniSequel.Model
 where
   import MiniSequel.Expression
   import Data.List (intercalate)
+  import Data.Data
+  import qualified Data.Map as Map
 
   class SequelModel a where
     create_model :: Model a
 
-
-
-  data SequelType = 
+  data SequelType =
     SequelBoolean |
     SequelInteger |
-    SequelVarchar Int | 
+    SequelVarchar Int |
     SequelDate |
     SequelDateTime |
     SequelTime |
-    SequelDouble
+    SequelDouble |
+    SequelEnumeration [String] |
+    SequelText
 
   data SequelField = SequelField {
-    _type :: SequelType, 
-    _name :: SequelExpression, 
+    _type :: SequelType,
+    _name :: SequelExpression,
     _default :: Maybe SequelExpression,
     _null :: Bool,
     _primary_key :: Bool,
@@ -28,10 +31,10 @@ where
   }
 
   data Model a = Model{
-    _name' :: SequelExpression, 
+    _name' :: SequelExpression,
     _columns :: [SequelField],
     _safe_creation :: Bool
-  } 
+  }
 
   if_not_exists m = m { _safe_creation = True}
 
@@ -67,7 +70,7 @@ where
   show_null False = " NOT NULL "
 
   show_default Nothing = ""
-  show_default (Just val) = " DEFAULT "++show val 
+  show_default (Just val) = " DEFAULT "++show val
 
   show_auto_increment False = ""
   show_auto_increment True = " AUTO_INCREMENT "
@@ -77,6 +80,7 @@ where
 
   show_fields fields = intercalate ", " $ map show fields
 
+
   instance Show SequelType where
     show SequelInteger = "INTEGER"
     show (SequelVarchar size) = "VARCHAR(" ++ show size ++ ")"
@@ -84,25 +88,27 @@ where
     show SequelDateTime = "DATETIME"
     show SequelTime = "TIME"
     show SequelDouble = "DOUBLE"
+    show SequelText = "TEXT"
     show SequelBoolean = " BOOLEAN"
+    show (SequelEnumeration values)= "ENUM(" ++ show_fields values ++ ")"
 
 
   instance Show (Model a) where
-    show (Model name@(SequelSymbol _) fields safe) = 
-      "CREATE TABLE " ++ 
+    show (Model name@(SequelSymbol _) fields safe) =
+      "CREATE TABLE " ++
       (if safe then " IF NOT EXISTS " else "") ++
-      show name ++ 
+      show name ++
       "(" ++
       show_fields fields ++
       ")"
 
   instance Show SequelField where
     show (SequelField t name def nul pk ai uni) =
-      show name ++ 
-      " " ++ 
-      show t ++ 
+      show name ++
+      " " ++
+      show t ++
       show_null nul ++
-      show_default def ++ 
-      show_auto_increment ai ++ 
+      show_default def ++
+      show_auto_increment ai ++
       show_primary_key pk ++
       if uni then (" UNIQUE ") else ""
