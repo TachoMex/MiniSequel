@@ -65,10 +65,12 @@ library
   -- other-extensions:
 
   -- Other library packages from which modules are imported.
-  build-depends:       base >=4.6 && <4.7,
+  build-depends:       base >4.6.0.1,
                        HDBC,
                        containers,
-                       HDBC-mysql
+                       HDBC-mysql,
+                       generics-sop,
+                       cases
 
   -- Directories containing source files.
   hs-source-dirs:      src
