@@ -17,7 +17,7 @@ where
   }
 
   data SequelColumn = SequelColumn SequelExpression
-  data SequelQueryType = INSERT | DELETE | UPDATE | SELECT deriving (Show)
+  data SequelQueryType = INSERT | DELETE | UPDATE | SELECT deriving (Show, Eq)
   data SequelTable =
     SequelTable (SequelExpression) |
     SequelJoin SequelTable SequelTable SequelJoinType SequelExpression
@@ -191,8 +191,10 @@ where
   t s@(SequelSymbol _) = SequelTable s
   ts = SequelTable . SequelSymbol
   s = SequelSymbol
-  n = SequelNumber
-  v = SequelString
+  nd = SequelNumber
+  ni = SequelIntegral
+  v s = SequelString $ show s
+  don't_escape = SequelString
   f = SequelFunctor
   now = f NOW []
   current_timestamp = CurrentTimeStamp
