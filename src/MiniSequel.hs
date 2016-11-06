@@ -5,7 +5,7 @@ where
   import Data.Maybe
   import MiniSequel.Expression
   data SequelQuery = SequelQuery {
-    _query_type :: SequelQueryType,
+    _queryType :: SequelQueryType,
     _colums :: Maybe [SequelExpression],
     _from :: SequelTable,
     _values :: Maybe [[SequelExpression]],
@@ -19,7 +19,7 @@ where
   data SequelColumn = SequelColumn SequelExpression
   data SequelQueryType = INSERT | DELETE | UPDATE | SELECT deriving (Show, Eq)
   data SequelTable =
-    SequelTable (SequelExpression) |
+    SequelTable SequelExpression |
     SequelJoin SequelTable SequelTable SequelJoinType SequelExpression
   data SequelOrder = Asc SequelExpression | Desc SequelExpression
   data SequelJoinType = INNER | LEFT | RIGHT deriving (Show)
@@ -39,7 +39,7 @@ where
 
   from :: SequelTable -> SequelQuery
   from table = SequelQuery {
-    _query_type = SELECT,
+    _queryType = SELECT,
     _colums = Nothing,
     _from = table,
     _values = Nothing,
@@ -52,19 +52,19 @@ where
 
   select :: [SequelExpression] -> SequelQuery -> SequelQuery
   select fields query =
-    query {_query_type = SELECT, _colums = Just fields}
+    query {_queryType = SELECT, _colums = Just fields}
 
   where' :: SequelExpression -> SequelQuery -> SequelQuery
   where' cond query =
-    query {_where = (Just cond)}
+    query {_where = Just cond}
 
   update :: [SequelExpression] -> SequelQuery -> SequelQuery
   update fields query =
-    query {_query_type = UPDATE, _colums = (Just fields)}
+    query {_queryType = UPDATE, _colums = Just fields}
 
   insert :: [SequelExpression] -> SequelQuery -> SequelQuery
   insert cols query =
-    query {_query_type = INSERT, _colums = (Just cols)}
+    query {_queryType = INSERT, _colums = Just cols}
 
   values ::[[SequelExpression]] -> SequelQuery -> SequelQuery
   values vals query =
@@ -73,28 +73,28 @@ where
   into = from
 
   delete :: SequelQuery -> SequelQuery
-  delete query = query {_query_type = DELETE}
+  delete query = query {_queryType = DELETE}
 
-  order_by :: [SequelOrder] -> SequelQuery -> SequelQuery
-  order_by criteria query =
+  orderBy :: [SequelOrder] -> SequelQuery -> SequelQuery
+  orderBy criteria query =
     query {_order = Just criteria}
 
-  group_by :: [SequelExpression] -> SequelQuery -> SequelQuery
-  group_by criteria query =
+  groupBy :: [SequelExpression] -> SequelQuery -> SequelQuery
+  groupBy criteria query =
     query {_group = Just criteria}
 
   having :: SequelExpression -> SequelQuery -> SequelQuery
   having cond query =
     query {_having = Just cond}
 
-  inner_join :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
-  inner_join a b cond = SequelJoin a b INNER cond
+  innerJoin :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
+  innerJoin a b = SequelJoin a b INNER
 
-  right_join :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
-  right_join a b cond = SequelJoin a b RIGHT cond
+  rightJoin :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
+  rightJoin a b = SequelJoin a b RIGHT
 
-  left_join :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
-  left_join a b cond = SequelJoin a b LEFT cond
+  leftJoin :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
+  leftJoin a b = SequelJoin a b LEFT
 
   limit :: Int -> SequelQuery -> SequelQuery
   limit lim query
@@ -110,41 +110,41 @@ where
   first :: SequelQuery -> SequelQuery
   first = limit 1
 
-  show_cols Nothing = "*"
-  show_cols (Just cols) = intercalate "," $ map show cols
+  showCols Nothing = "*"
+  showCols (Just cols) = intercalate "," $ map show cols
 
-  show_cond Nothing = ""
-  show_cond (Just cond) = " WHERE " ++ show cond
+  showCond Nothing = ""
+  showCond (Just cond) = " WHERE " ++ show cond
 
-  show_order Nothing = ""
-  show_order (Just criteria) = " ORDER BY " ++ intercalate ", "  (fmap show criteria)
+  showOrder Nothing = ""
+  showOrder (Just criteria) = " ORDER BY " ++ intercalate ", "  (fmap show criteria)
 
-  show_group Nothing = ""
-  show_group (Just criteria) = " GROUP BY " ++ intercalate ", " (fmap show criteria)
+  showGroup Nothing = ""
+  showGroup (Just criteria) = " GROUP BY " ++ intercalate ", " (fmap show criteria)
 
-  show_having Nothing = ""
-  show_having (Just cond) = " HAVING " ++ show cond
+  showHaving Nothing = ""
+  showHaving (Just cond) = " HAVING " ++ show cond
 
-  show_single_set (SequelRelationalOperation Equal s@(SequelSymbol _) a) =
+  showSingleSet (SequelRelationalOperation Equal s@(SequelSymbol _) a) =
     show s ++ " = " ++ show a
-  show_single_set (SequelRelationalOperation Equal s@(SequelSymbolOperation _ _ _) a) =
+  showSingleSet (SequelRelationalOperation Equal s@SequelSymbolOperation{} a) =
     show s ++ " = " ++ show a
-  show_set (Just cols) = intercalate "," $ map show_single_set cols
+  showSet (Just cols) = intercalate "," $ map showSingleSet cols
 
-  show_insert_cols Nothing = ""
-  show_insert_cols (Just cols) =
+  showInsertCols Nothing = ""
+  showInsertCols (Just cols) =
     " (" ++
       intercalate ", " (map (show.SequelColumn) cols) ++
     ")"
 
-  show_limit Nothing = ""
-  show_limit (Just (a,0)) = " LIMIT " ++ show a
-  show_limit (Just (a,b)) = " LIMIT " ++ show a ++ " OFFSET " ++ show b
+  showLimit Nothing = ""
+  showLimit (Just (a,0)) = " LIMIT " ++ show a
+  showLimit (Just (a,b)) = " LIMIT " ++ show a ++ " OFFSET " ++ show b
 
-  show_simple_limit Nothing = ""
-  show_simple_limit (Just (a, _)) = " LIMIT " ++ show a
+  showSimpleLimit Nothing = ""
+  showSimpleLimit (Just (a, _)) = " LIMIT " ++ show a
 
-  show_vals (Just cols) =
+  showVals (Just cols) =
     intercalate ", " $
       map (\ row ->
         "(" ++
@@ -153,40 +153,40 @@ where
       )
       cols
 
-  show_query (SequelQuery SELECT cols table _ cond order group_by having lim) =
+  showQuery (SequelQuery SELECT cols table _ cond order groupBy having lim) =
     "SELECT " ++
-    show_cols cols ++
+    showCols cols ++
     " FROM " ++
     show table ++
-    show_cond cond ++
-    show_order order ++
-    show_group group_by ++
-    show_having having ++
-    show_limit lim
+    showCond cond ++
+    showOrder order ++
+    showGroup groupBy ++
+    showHaving having ++
+    showLimit lim
 
-  show_query (SequelQuery UPDATE cols table _ cond _ _ _ lim) =
+  showQuery (SequelQuery UPDATE cols table _ cond _ _ _ lim) =
     "UPDATE " ++
     show table ++
     " SET " ++
-    show_set cols ++
-    show_cond cond ++
-    show_simple_limit lim
+    showSet cols ++
+    showCond cond ++
+    showSimpleLimit lim
 
-  show_query (SequelQuery INSERT cols table vals _ _ _ _ _) =
+  showQuery (SequelQuery INSERT cols table vals _ _ _ _ _) =
     "INSERT INTO " ++
     show table ++
-    show_insert_cols cols ++
+    showInsertCols cols ++
     " VALUES " ++
-    show_vals vals
+    showVals vals
 
-  show_query (SequelQuery DELETE _ table _ cond _ _ _ lim) =
+  showQuery (SequelQuery DELETE _ table _ cond _ _ _ lim) =
     "DELETE FROM " ++
     show table ++
-    show_cond cond ++
-    show_simple_limit lim
+    showCond cond ++
+    showSimpleLimit lim
 
   instance Show SequelQuery where
-    show = show_query
+    show = showQuery
 
   t s@(SequelSymbol _) = SequelTable s
   ts = SequelTable . SequelSymbol
@@ -194,7 +194,7 @@ where
   nd = SequelNumber
   ni = SequelIntegral
   v s = SequelString $ show s
-  don't_escape = SequelString
+  don'tEscape = SequelString
   f = SequelFunctor
   now = f NOW []
-  current_timestamp = CurrentTimeStamp
+  currentTimestamp = CurrentTimeStamp

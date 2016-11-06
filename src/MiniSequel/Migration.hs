@@ -1,0 +1,3 @@
+module MiniSequel.Migration
+where
+

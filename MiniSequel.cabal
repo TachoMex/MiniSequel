@@ -53,10 +53,11 @@ library
   -- Modules exported by the library.
   exposed-modules:         MiniSequel
                            MiniSequel.Adapter,
+                           MiniSequel.Adapter.Log,
                            MiniSequel.Expression,
                            MiniSequel.Migration,
-                           MiniSequel.Model,
-                           MiniSequel.Mapper
+                           MiniSequel.Mapper,
+                           MiniSequel.Model
 
   -- Modules included in this library but not exported.
   -- other-modules:

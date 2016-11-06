@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 module MiniSequel.Model
 where
   import MiniSequel.Expression
@@ -7,7 +6,7 @@ where
   import qualified Data.Map as Map
 
   class SequelModel a where
-    create_model :: Model a
+    createModel :: Model a
 
   data SequelType =
     SequelBoolean |
@@ -25,20 +24,20 @@ where
     _name :: SequelExpression,
     _default :: Maybe SequelExpression,
     _null :: Bool,
-    _primary_key :: Bool,
-    _auto_increment :: Bool,
+    _primaryKey :: Bool,
+    _autoIncrement :: Bool,
     _unique :: Bool
   }
 
   data Model a = Model{
     _name' :: SequelExpression,
     _columns :: [SequelField],
-    _safe_creation :: Bool
+    _safeCreation :: Bool
   }
 
-  if_not_exists m = m { _safe_creation = True}
+  ifNotExists m = m { _safeCreation = True}
 
-  table name cols = Model { _name' = name, _columns = cols, _safe_creation = False}
+  table name cols = Model { _name' = name, _columns = cols, _safeCreation = False}
 
   column :: SequelExpression -> SequelType -> SequelField
   column name@(SequelSymbol _) type' = SequelField {
@@ -46,19 +45,19 @@ where
       _name = name,
       _default = Nothing,
       _null = True,
-      _primary_key = False,
-      _auto_increment = False,
+      _primaryKey = False,
+      _autoIncrement = False,
       _unique = False
     }
 
-  not_null :: SequelField -> SequelField
-  not_null field = field { _null = False }
+  notNull :: SequelField -> SequelField
+  notNull field = field { _null = False }
 
-  auto_increment :: SequelField -> SequelField
-  auto_increment field = field { _auto_increment = True }
+  autoIncrement :: SequelField -> SequelField
+  autoIncrement field = field { _autoIncrement = True }
 
-  primary_key :: SequelField -> SequelField
-  primary_key field = field { _primary_key = True }
+  primaryKey :: SequelField -> SequelField
+  primaryKey field = field { _primaryKey = True }
 
   default' :: SequelExpression -> SequelField -> SequelField
   default' value field = field { _default = Just value}
@@ -66,19 +65,19 @@ where
   unique ::SequelField -> SequelField
   unique field = field { _unique = True }
 
-  show_null True = " NULL "
-  show_null False = " NOT NULL "
+  showNull True = " NULL "
+  showNull False = " NOT NULL "
 
-  show_default Nothing = ""
-  show_default (Just val) = " DEFAULT "++show val
+  showDefault Nothing = ""
+  showDefault (Just val) = " DEFAULT "++show val
 
-  show_auto_increment False = ""
-  show_auto_increment True = " AUTO_INCREMENT "
+  showAutoIncrement False = ""
+  showAutoIncrement True = " AUTO_INCREMENT "
 
-  show_primary_key False = ""
-  show_primary_key True = " PRIMARY KEY "
+  showPrimaryKey False = ""
+  showPrimaryKey True = " PRIMARY KEY "
 
-  show_fields fields = intercalate ", " $ map show fields
+  showFields fields = intercalate ", " $ map show fields
 
 
   instance Show SequelType where
@@ -90,7 +89,7 @@ where
     show SequelDouble = "DOUBLE"
     show SequelText = "TEXT"
     show SequelBoolean = " BOOLEAN"
-    show (SequelEnumeration values)= "ENUM(" ++ show_fields values ++ ")"
+    show (SequelEnumeration values)= "ENUM(" ++ showFields values ++ ")"
 
 
   instance Show (Model a) where
@@ -99,7 +98,7 @@ where
       (if safe then " IF NOT EXISTS " else "") ++
       show name ++
       "(" ++
-      show_fields fields ++
+      showFields fields ++
       ")"
 
   instance Show SequelField where
@@ -107,8 +106,8 @@ where
       show name ++
       " " ++
       show t ++
-      show_null nul ++
-      show_default def ++
-      show_auto_increment ai ++
-      show_primary_key pk ++
-      if uni then (" UNIQUE ") else ""
+      showNull nul ++
+      showDefault def ++
+      showAutoIncrement ai ++
+      showPrimaryKey pk ++
+      if uni then " UNIQUE " else ""

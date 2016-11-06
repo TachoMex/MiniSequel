@@ -61,96 +61,92 @@ module MiniSequel.Expression where
 
   infixr 0 ||.    -- Boolean or
   (||.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (||.) = appy_boolean_functor BooleanOr
+  (||.) = applyBooleanFunctor BooleanOr
 
 
   infixr 1 &&.    -- Boolean and
   (&&.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (&&.) = appy_boolean_functor BooleanAnd
+  (&&.) = applyBooleanFunctor BooleanAnd
 
   infixr 2 |.     -- bitwise or
   (|.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (|.) = apply_numeric_functor BitOr
+  (|.) = applyNumericFunctor BitOr
 
   infixr 2 ^.     -- bitwise xor
   (^.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (^.) = apply_numeric_functor BitXor
+  (^.) = applyNumericFunctor BitXor
 
   infixr 3 &.     -- bitwsie and
   (&.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (&.) = apply_numeric_functor BitAnd
+  (&.) = applyNumericFunctor BitAnd
 
   infix 4 =.     -- comparison
   (=.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (=.) = apply_relational_functor Equal
+  (=.) = applyRelationalFunctor Equal
 
   infix 4 <>.    -- different
   (<>.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (<>.) = apply_relational_functor Different
+  (<>.) = applyRelationalFunctor Different
 
   infix 4 <.     -- lesser
   (<.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (<.) = apply_relational_functor Less
+  (<.) = applyRelationalFunctor Less
 
 
   infix 4 <=.    -- lesser or equal
   (<=.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (<=.) = apply_relational_functor LessEq
+  (<=.) = applyRelationalFunctor LessEq
 
 
   infix 4 >.     -- greater
   (>.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (>.) = apply_relational_functor Greater
+  (>.) = applyRelationalFunctor Greater
 
 
   infix 4 >=.    -- greater or equal
   (>=.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (>=.) = apply_relational_functor GreaterEq
+  (>=.) = applyRelationalFunctor GreaterEq
 
   infixl 5 >>.    -- right shift
   (>>.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (>>.) = apply_numeric_functor BitRightShift
+  (>>.) = applyNumericFunctor BitRightShift
 
   infixl 5 <<. -- left shift
   (<<.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (<<.) = apply_numeric_functor BitLeftShift
+  (<<.) = applyNumericFunctor BitLeftShift
 
   infixl 6 +.    -- addition
   (+.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (+.) = apply_numeric_functor Add
+  (+.) = applyNumericFunctor Add
 
   infixl 6 -.    -- substracion
   (-.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (-.) = apply_numeric_functor Substract
+  (-.) = applyNumericFunctor Substract
 
   infixl 7 *.    -- multiplication
   (*.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (*.) = apply_numeric_functor Multiply
+  (*.) = applyNumericFunctor Multiply
 
 
   infixl 7 /.    -- division
   (/.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (/.) = apply_numeric_functor Divide
+  (/.) = applyNumericFunctor Divide
 
   infixl 7 %.    -- modulus
   (%.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (%.) = apply_numeric_functor Modulus
+  (%.) = applyNumericFunctor Modulus
 
   infixr 8 **.   -- exponentiation
   (**.) :: SequelExpression -> SequelExpression -> SequelExpression
-  (**.) a@(SequelNumericOperation _ _ _) b@(SequelNumericOperation _ _ _) = SequelFunctor POWER [a,b]
-  (**.) a@(SequelNumber _) b@(SequelNumericOperation _ _ _) = SequelFunctor POWER [a,b]
-  (**.) a@(SequelNumericOperation _ _ _) b@(SequelNumber _) = SequelFunctor POWER [a,b]
+  (**.) a@SequelNumericOperation{} b@SequelNumericOperation{} = SequelFunctor POWER [a,b]
+  (**.) a@(SequelNumber _) b@SequelNumericOperation{} = SequelFunctor POWER [a,b]
+  (**.) a@SequelNumericOperation{} b@(SequelNumber _) = SequelFunctor POWER [a,b]
   (**.) a b = error $ "Unknown operatrion for (**) with:\n"++show a ++"\n"++ show b
-
-
 
   infix 9 ~>    -- column accessor
   (~>) :: SequelExpression -> SequelExpression -> SequelExpression
   (~>) a@(SequelSymbol _) b@(SequelSymbol _) = SequelSymbolOperation Access a b
   (~>) a b = error $ "Unknown operatrion for (~>) with:\n"++show a ++"\n"++ show b
-
-
 
   infixl 6 =:=   -- string concatenation
   (=:=) :: SequelExpression -> SequelExpression -> SequelExpression
@@ -210,33 +206,33 @@ module MiniSequel.Expression where
     show Concat = "CONCAT"
 
 
-  is_value (SequelNumber _) = True
-  is_value (SequelIntegral _) = True
-  is_value (SequelNumericOperation _ _ _) = True
-  is_value (SequelString _ ) = True
-  is_value (SequelStringOperation _ _ _) = True
-  is_value (SequelSymbol _) = True
-  is_value (SequelSymbolOperation _ _ _) = True
-  is_value (SequelFunctor _ _) = True
+  isValue (SequelNumber _) = True
+  isValue (SequelIntegral _) = True
+  isValue SequelNumericOperation{} = True
+  isValue (SequelString _ ) = True
+  isValue SequelStringOperation{} = True
+  isValue (SequelSymbol _) = True
+  isValue SequelSymbolOperation{} = True
+  isValue (SequelFunctor _ _) = True
 
-  apply_function construct op a b
-    | is_value a && is_value b = construct op a b
+  applyFunction construct op a b
+    | isValue a && isValue b = construct op a b
     | otherwise = error $ "Unknown operation for "++show op++" with:\n"++show a ++"\n"++ show b
 
 
 
-  apply_numeric_functor :: SequelNumberOperator -> SequelExpression -> SequelExpression  -> SequelExpression
-  apply_numeric_functor = apply_function SequelNumericOperation
+  applyNumericFunctor :: SequelNumberOperator -> SequelExpression -> SequelExpression  -> SequelExpression
+  applyNumericFunctor = applyFunction SequelNumericOperation
 
-  apply_relational_functor :: SequelRelationalOperator -> SequelExpression -> SequelExpression -> SequelExpression
-  apply_relational_functor = apply_function SequelRelationalOperation
+  applyRelationalFunctor :: SequelRelationalOperator -> SequelExpression -> SequelExpression -> SequelExpression
+  applyRelationalFunctor = applyFunction SequelRelationalOperation
 
-  appy_boolean_functor :: SequelBooleanOperator -> SequelExpression -> SequelExpression -> SequelExpression
-  appy_boolean_functor op a@(SequelRelationalOperation _ _ _) b@(SequelRelationalOperation _ _ _) = SequelBoolOperation op a b
-  appy_boolean_functor op a@(SequelBoolOperation _ _ _) b@(SequelRelationalOperation _ _ _) = SequelBoolOperation op a b
-  appy_boolean_functor op a@(SequelRelationalOperation _ _ _) b@(SequelBoolOperation _ _ _) = SequelBoolOperation op a b
-  appy_boolean_functor op a@(SequelBoolOperation _ _ _) b@(SequelBoolOperation _ _ _) = SequelBoolOperation op a b
-  appy_boolean_functor op a b = error $ "Unknown operation for "++show op++" with:\n"++show a ++"\n"++ show b
+  applyBooleanFunctor :: SequelBooleanOperator -> SequelExpression -> SequelExpression -> SequelExpression
+  applyBooleanFunctor op a@SequelRelationalOperation{} b@SequelRelationalOperation{} = SequelBoolOperation op a b
+  applyBooleanFunctor op a@SequelBoolOperation{} b@SequelRelationalOperation{} = SequelBoolOperation op a b
+  applyBooleanFunctor op a@SequelRelationalOperation{} b@SequelBoolOperation{} = SequelBoolOperation op a b
+  applyBooleanFunctor op a@SequelBoolOperation{} b@SequelBoolOperation{} = SequelBoolOperation op a b
+  applyBooleanFunctor op a b = error $ "Unknown operation for "++show op++" with:\n"++show a ++"\n"++ show b
 
 
 
