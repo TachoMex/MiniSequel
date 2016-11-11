@@ -55,8 +55,9 @@ where
     query {_queryType = SELECT, _colums = Just fields}
 
   where' :: SequelExpression -> SequelQuery -> SequelQuery
-  where' cond query =
-    query {_where = Just cond}
+  where' cond query
+    | isNothing $ _where query = query {_where = Just cond}
+    | otherwise = query {_where = Just (cond &&. fromJust (_where query))}
 
   update :: [SequelExpression] -> SequelQuery -> SequelQuery
   update fields query =
