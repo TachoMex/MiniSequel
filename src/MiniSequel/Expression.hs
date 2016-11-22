@@ -33,6 +33,7 @@ module MiniSequel.Expression where
     SequelString String |
     SequelNumber Double |
     SequelIntegral Int |
+    SequelBool Bool |
     SequelNumList [Double] |
     SquelStringList [String] |
     SequelFunctor SequelBuiltInFunc [SequelExpression] |
@@ -157,6 +158,8 @@ module MiniSequel.Expression where
   (=:) a s@(SequelSymbol _) = SequelSymbolOperation As a s
 
   instance Show SequelExpression where
+    show (SequelBool True) = "1"
+    show (SequelBool False) = "0"
     show (SequelString s) = s
     show (SequelNumber n) = show n
     show (SequelIntegral i) = show i
@@ -233,10 +236,3 @@ module MiniSequel.Expression where
   applyBooleanFunctor op a@SequelRelationalOperation{} b@SequelBoolOperation{} = SequelBoolOperation op a b
   applyBooleanFunctor op a@SequelBoolOperation{} b@SequelBoolOperation{} = SequelBoolOperation op a b
   applyBooleanFunctor op a b = error $ "Unknown operation for "++show op++" with:\n"++show a ++"\n"++ show b
-
-
-
-
-
---  s"table" ~> s"attemps"  >=. n 3 &&. s "loan_id" =. v "123123" &&. s "salario" *. n 3 <>. n 10000
---  x >= 3 and loan_id = '123123' and salario*3 != 100000

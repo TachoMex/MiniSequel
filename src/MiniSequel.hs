@@ -194,6 +194,7 @@ where
   s = SequelSymbol
   nd = SequelNumber
   ni = SequelIntegral
+  b = SequelBool
   v s = SequelString $ show s
   don'tEscape = SequelString
   f = SequelFunctor
