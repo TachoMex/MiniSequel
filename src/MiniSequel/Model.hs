@@ -26,8 +26,9 @@ where
     _null :: Bool,
     _primaryKey :: Bool,
     _autoIncrement :: Bool,
-    _unique :: Bool
-  }
+    _unique :: Bool,
+    _foreignKey :: Maybe SequelExpression
+  } | SequelUniqueKey [SequelExpression]
 
   data Model a = Model{
     _name' :: SequelExpression,
@@ -47,7 +48,8 @@ where
       _null = True,
       _primaryKey = False,
       _autoIncrement = False,
-      _unique = False
+      _unique = False,
+      _foreignKey = Nothing
     }
 
   notNull :: SequelField -> SequelField
@@ -56,14 +58,20 @@ where
   autoIncrement :: SequelField -> SequelField
   autoIncrement field = field { _autoIncrement = True }
 
+  foreignKey :: SequelExpression -> SequelField -> SequelField
+  foreignKey refer field = field {_foreignKey = Just refer }
+
   primaryKey :: SequelField -> SequelField
   primaryKey field = field { _primaryKey = True }
 
   default' :: SequelExpression -> SequelField -> SequelField
   default' value field = field { _default = Just value}
 
-  unique ::SequelField -> SequelField
+  unique :: SequelField -> SequelField
   unique field = field { _unique = True }
+
+  uniqueKey :: [SequelExpression] -> SequelField
+  uniqueKey = SequelUniqueKey
 
   showNull True = " NULL "
   showNull False = " NOT NULL "
@@ -102,7 +110,8 @@ where
       ")"
 
   instance Show SequelField where
-    show (SequelField t name def nul pk ai uni) =
+    show (SequelUniqueKey fields) = "UNIQUE (" ++ intercalate ", " (map show fields) ++ ")"
+    show (SequelField t name def nul pk ai uni fk) =
       show name ++
       " " ++
       show t ++
@@ -110,4 +119,10 @@ where
       showDefault def ++
       showAutoIncrement ai ++
       showPrimaryKey pk ++
-      if uni then " UNIQUE " else ""
+      if uni then " UNIQUE " else "" ++
+      case fk of
+        Nothing -> ""
+        Just (SequelSymbolOperation Access tabS@(SequelSymbol tab)  colS@(SequelSymbol col)) ->
+          ", CONSTRAINT " ++ show (SequelSymbol $ "fk" ++ tab) ++
+            "FOREIGN KEY(" ++ show name  ++ ") " ++
+            "REFERENCES " ++ show tabS ++ "(" ++ show colS ++ ")"
