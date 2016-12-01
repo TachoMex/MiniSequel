@@ -13,7 +13,8 @@ where
     _order :: Maybe [SequelOrder],
     _group :: Maybe [SequelExpression],
     _having :: Maybe SequelExpression,
-    _limit :: Maybe (Int, Int)
+    _limit :: Maybe (Int, Int),
+    _upsert :: Bool
   }
 
   data SequelColumn = SequelColumn SequelExpression
@@ -27,7 +28,7 @@ where
 
   instance Show SequelTable where
     show (SequelTable s) = show s
-    show (SequelJoin a b t expr) = "(" ++ show a ++ " " ++ show t ++ " JOIN " ++ show b ++ " ON " ++show expr ++ ")"
+    show (SequelJoin a b t expr) = "(" ++ show a ++ " " ++ show t ++ " JOIN " ++ show b ++ " ON " ++ show expr ++ ")"
 
   instance Show SequelOrder where
     show (Asc exp) = show exp ++ " ASC"
@@ -47,7 +48,8 @@ where
     _order = Nothing,
     _group = Nothing,
     _having = Nothing,
-    _limit = Nothing
+    _limit = Nothing,
+    _upsert = False
   }
 
   select :: [SequelExpression] -> SequelQuery -> SequelQuery
@@ -111,6 +113,8 @@ where
   first :: SequelQuery -> SequelQuery
   first = limit 1
 
+  onDuplicateKeyUpdate query = query { _upsert = True }
+
   showCols Nothing = "*"
   showCols (Just cols) = intercalate "," $ map show cols
 
@@ -154,7 +158,12 @@ where
       )
       cols
 
-  showQuery (SequelQuery SELECT cols table _ cond order groupBy having lim) =
+  showUpsert False _ = ""
+  showUpsert True (Just fields) = "ON DUPLICATE KEY UPDATE " ++ intercalate "," (map showUpdateValue fields)
+
+  showUpdateValue field = show field ++ " = VALUES(" ++ show field ++ ")"
+
+  showQuery (SequelQuery SELECT cols table _ cond order groupBy having lim _) =
     "SELECT " ++
     showCols cols ++
     " FROM " ++
@@ -165,7 +174,7 @@ where
     showHaving having ++
     showLimit lim
 
-  showQuery (SequelQuery UPDATE cols table _ cond _ _ _ lim) =
+  showQuery (SequelQuery UPDATE cols table _ cond _ _ _ lim _) =
     "UPDATE " ++
     show table ++
     " SET " ++
@@ -173,14 +182,17 @@ where
     showCond cond ++
     showSimpleLimit lim
 
-  showQuery (SequelQuery INSERT cols table vals _ _ _ _ _) =
+
+  showQuery (SequelQuery INSERT cols table vals _ _ _ _ _ upsert) =
     "INSERT INTO " ++
     show table ++
     showInsertCols cols ++
     " VALUES " ++
-    showVals vals
+    showVals vals ++
+    showUpsert upsert cols
 
-  showQuery (SequelQuery DELETE _ table _ cond _ _ _ lim) =
+
+  showQuery (SequelQuery DELETE _ table _ cond _ _ _ lim _) =
     "DELETE FROM " ++
     show table ++
     showCond cond ++
