@@ -7,18 +7,17 @@ where
   import MiniSequel.Model
   import MiniSequel.Expression
   import Database.HDBC
-  import Database.HDBC.MySQL(withRTSSignalsBlocked)
 
 
   --type SequelRow = (Map.Map String ByteString)
 
   exec :: (IConnection c) => c -> SequelQuery -> IO [[SqlValue]]
   exec con query
-    | _queryType query == SELECT = withRTSSignalsBlocked $ quickQuery' con (show query) []
+    | _queryType query == SELECT = quickQuery' con (show query) []
     | otherwise =
       do
-        withRTSSignalsBlocked $ run con (show query) []
-        return [[SqlNull]]
+        result <- run con (show query) []
+        return [[toSql result]]
 
   takeModel :: (IConnection c) => c -> Model b -> IO Integer
-  takeModel con model = withRTSSignalsBlocked $ run con (show model) []
+  takeModel con model = run con (show model) []

@@ -1,6 +1,7 @@
 module MiniSequel.Model
 where
   import MiniSequel.Expression
+  import MiniSequel
   import Data.List (intercalate)
   import Data.Data
   import qualified Data.Map as Map
@@ -14,10 +15,15 @@ where
     SequelVarchar Int |
     SequelDate |
     SequelDateTime |
+    SequelTimeStamp |
     SequelTime |
     SequelDouble |
-    SequelEnumeration [String] |
-    SequelText
+    SequelEnumeration [SequelExpression] |
+    SequelText |
+    SequelSerial |
+    SequelFKSerial
+
+  data SequelConstraintKey = SequelCUniqKey | SequelCPrimaryKey | SequelCForeignKey
 
   data SequelField = SequelField {
     _type :: SequelType,
@@ -28,7 +34,7 @@ where
     _autoIncrement :: Bool,
     _unique :: Bool,
     _foreignKey :: Maybe SequelExpression
-  } | SequelUniqueKey [SequelExpression]
+  } | SequelConstraint SequelConstraintKey [SequelExpression]
 
   data Model a = Model{
     _name' :: SequelExpression,
@@ -56,10 +62,10 @@ where
   notNull field = field { _null = False }
 
   autoIncrement :: SequelField -> SequelField
-  autoIncrement field = field { _autoIncrement = True }
+  autoIncrement field = field { _autoIncrement = True , _type = SequelSerial }
 
   foreignKey :: SequelExpression -> SequelField -> SequelField
-  foreignKey refer field = field {_foreignKey = Just refer }
+  foreignKey refer field = field { _foreignKey = Just refer }
 
   primaryKey :: SequelField -> SequelField
   primaryKey field = field { _primaryKey = True }
@@ -71,7 +77,11 @@ where
   unique field = field { _unique = True }
 
   uniqueKey :: [SequelExpression] -> SequelField
-  uniqueKey = SequelUniqueKey
+  uniqueKey = SequelConstraint SequelCUniqKey
+
+  cPrimaryKey :: [SequelExpression] -> SequelField
+  cPrimaryKey = SequelConstraint SequelCPrimaryKey
+
 
   showNull True = " NULL "
   showNull False = " NOT NULL "
@@ -85,19 +95,22 @@ where
   showPrimaryKey False = ""
   showPrimaryKey True = " PRIMARY KEY "
 
-  showFields fields = intercalate ", " $ map show fields
+  showFields table fields = intercalate ", " $ map (showField table) fields
 
 
   instance Show SequelType where
     show SequelInteger = "INTEGER"
+    show SequelFKSerial = "BIGINT(20) UNSIGNED"
     show (SequelVarchar size) = "VARCHAR(" ++ show size ++ ")"
     show SequelDate = "DATE"
     show SequelDateTime = "DATETIME"
+    show SequelTimeStamp = "TIMESTAMP"
     show SequelTime = "TIME"
     show SequelDouble = "DOUBLE"
     show SequelText = "TEXT"
+    show SequelSerial = "SERIAL"
     show SequelBoolean = " BOOLEAN"
-    show (SequelEnumeration values)= "ENUM(" ++ showFields values ++ ")"
+    show (SequelEnumeration values)= "ENUM(" ++ ( intercalate "," $ map show values) ++ ")"
 
 
   instance Show (Model a) where
@@ -106,23 +119,24 @@ where
       (if safe then " IF NOT EXISTS " else "") ++
       show name ++
       "(" ++
-      showFields fields ++
+      showFields name fields ++
       ")"
 
-  instance Show SequelField where
-    show (SequelUniqueKey fields) = "UNIQUE (" ++ intercalate ", " (map show fields) ++ ")"
-    show (SequelField t name def nul pk ai uni fk) =
-      show name ++
-      " " ++
-      show t ++
-      showNull nul ++
-      showDefault def ++
-      showAutoIncrement ai ++
-      showPrimaryKey pk ++
-      if uni then " UNIQUE " else "" ++
-      case fk of
-        Nothing -> ""
-        Just (SequelSymbolOperation Access tabS@(SequelSymbol tab)  colS@(SequelSymbol col)) ->
-          ", CONSTRAINT " ++ show (SequelSymbol $ "fk" ++ tab) ++
-            "FOREIGN KEY(" ++ show name  ++ ") " ++
-            "REFERENCES " ++ show tabS ++ "(" ++ show colS ++ ")"
+
+  showField (SequelSymbol tableName) (SequelConstraint SequelCUniqKey fields) = "UNIQUE KEY (" ++ intercalate ", " (map show fields) ++ ")"
+  showField (SequelSymbol tableName) (SequelConstraint SequelCPrimaryKey fields) = "PRIMARY KEY (" ++ intercalate ", " (map show fields) ++ ")"
+  showField (SequelSymbol tableName) (SequelField t name@(SequelSymbol nme) def nul pk ai uni fk) =
+    show name ++
+    " " ++
+    show t ++
+    showNull nul ++
+    showDefault def ++
+    showAutoIncrement ai ++
+    showPrimaryKey pk ++
+    if uni then " UNIQUE " else "" ++
+    case fk of
+      Nothing -> ""
+      Just (SequelSymbolOperation Access tabS@(SequelSymbol tab)  colS@(SequelSymbol col)) ->
+        ", CONSTRAINT " ++ show (SequelSymbol $ "fk_" ++ tableName ++ "_" ++ nme) ++
+          " FOREIGN KEY(" ++ show name  ++ ") " ++
+          " REFERENCES " ++ show tabS ++ "(" ++ show colS ++ ")"

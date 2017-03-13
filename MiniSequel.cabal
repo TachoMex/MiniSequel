@@ -57,6 +57,7 @@ library
                            MiniSequel.Expression,
                            MiniSequel.Migration,
                            MiniSequel.Mapper,
+                           MiniSequel.Functions,
                            MiniSequel.Model
 
   -- Modules included in this library but not exported.
@@ -71,7 +72,10 @@ library
                        containers,
                        HDBC-mysql,
                        generics-sop,
-                       cases
+                       cases,
+                       text,
+                       bytestring,
+                       stringsearch
 
   -- Directories containing source files.
   hs-source-dirs:      src

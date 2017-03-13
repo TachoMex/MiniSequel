@@ -1,9 +1,19 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds
+           , TypeSynonymInstances
+           , FlexibleInstances
+           , OverloadedStrings #-}
 module MiniSequel
 where
   import Data.List (intercalate)
   import Data.Maybe
+  import qualified Data.Text as T
+  import qualified Data.Text.Lazy as TL
+  import qualified Data.ByteString.Char8 as BS
+  import qualified Data.ByteString.Search as BS
+
   import MiniSequel.Expression
+
+
   data SequelQuery = SequelQuery {
     _queryType :: SequelQueryType,
     _colums :: Maybe [SequelExpression],
@@ -14,9 +24,13 @@ where
     _group :: Maybe [SequelExpression],
     _having :: Maybe SequelExpression,
     _limit :: Maybe (Int, Int),
-    _upsert :: Bool
-  }
+    _upsert :: SequelUpsertConflict
+  } | PlainQuery String
 
+  data SequelUpsertConflict = SequelUpsertKey SequelExpression |
+                              SequelUpsertField SequelExpression |
+                              SequelUpsertAuto |
+                              SequelUpsertEmpty
   data SequelColumn = SequelColumn SequelExpression
   data SequelQueryType = INSERT | DELETE | UPDATE | SELECT deriving (Show, Eq)
   data SequelTable =
@@ -28,11 +42,11 @@ where
 
   instance Show SequelTable where
     show (SequelTable s) = show s
-    show (SequelJoin a b t expr) = "(" ++ show a ++ " " ++ show t ++ " JOIN " ++ show b ++ " ON " ++ show expr ++ ")"
+    show (SequelJoin a b t expr) = "(" `mappend` show a `mappend` " " `mappend` show t `mappend` " JOIN " `mappend` show b `mappend` show expr `mappend` ")"
 
   instance Show SequelOrder where
-    show (Asc exp) = show exp ++ " ASC"
-    show (Desc exp) = show exp ++ " DESC"
+    show (Asc exp) = show exp `mappend` " ASC"
+    show (Desc exp) = show exp `mappend` " DESC"
 
   instance Show SequelColumn where
     show (SequelColumn s@(SequelSymbol _)) = show s
@@ -49,7 +63,7 @@ where
     _group = Nothing,
     _having = Nothing,
     _limit = Nothing,
-    _upsert = False
+    _upsert = SequelUpsertEmpty
   }
 
   select :: [SequelExpression] -> SequelQuery -> SequelQuery
@@ -61,6 +75,8 @@ where
     | isNothing $ _where query = query {_where = Just cond}
     | otherwise = query {_where = Just (cond &&. fromJust (_where query))}
 
+  empty = select [v (1 :: Int)]
+
   update :: [SequelExpression] -> SequelQuery -> SequelQuery
   update fields query =
     query {_queryType = UPDATE, _colums = Just fields}
@@ -71,7 +87,7 @@ where
 
   values ::[[SequelExpression]] -> SequelQuery -> SequelQuery
   values vals query =
-    query {_values = Just vals}
+    query {_values = Just vals, _queryType =  INSERT }
 
   into = from
 
@@ -90,6 +106,9 @@ where
   having cond query =
     query {_having = Just cond}
 
+  join :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
+  join = innerJoin
+
   innerJoin :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
   innerJoin a b = SequelJoin a b INNER
 
@@ -98,6 +117,12 @@ where
 
   leftJoin :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
   leftJoin a b = SequelJoin a b LEFT
+
+  on :: SequelExpression -> SequelExpression
+  on = SequelOn
+
+  using :: [SequelExpression] -> SequelExpression
+  using = SequelUsing
 
   limit :: Int -> SequelQuery -> SequelQuery
   limit lim query
@@ -113,102 +138,163 @@ where
   first :: SequelQuery -> SequelQuery
   first = limit 1
 
-  onDuplicateKeyUpdate query = query { _upsert = True }
+  onDuplicateKeyUpdate query = query { _upsert = SequelUpsertAuto }
+  onConflictKeyUpdate s query = query { _upsert = SequelUpsertKey s }
 
   showCols Nothing = "*"
-  showCols (Just cols) = intercalate "," $ map show cols
+  showCols (Just cols) = intercalate "," $ fmap show cols
 
   showCond Nothing = ""
-  showCond (Just cond) = " WHERE " ++ show cond
+  showCond (Just cond) = " WHERE " `mappend` show cond
 
   showOrder Nothing = ""
-  showOrder (Just criteria) = " ORDER BY " ++ intercalate ", "  (fmap show criteria)
+  showOrder (Just criteria) = " ORDER BY " `mappend` intercalate ", "  (fmap show criteria)
 
   showGroup Nothing = ""
-  showGroup (Just criteria) = " GROUP BY " ++ intercalate ", " (fmap show criteria)
+  showGroup (Just criteria) = " GROUP BY " `mappend` intercalate ", " (fmap show criteria)
 
   showHaving Nothing = ""
-  showHaving (Just cond) = " HAVING " ++ show cond
+  showHaving (Just cond) = " HAVING " `mappend` show cond
 
   showSingleSet (SequelRelationalOperation Equal s@(SequelSymbol _) a) =
-    show s ++ " = " ++ show a
+    show s `mappend` " = " `mappend` show a
   showSingleSet (SequelRelationalOperation Equal s@SequelSymbolOperation{} a) =
-    show s ++ " = " ++ show a
-  showSet (Just cols) = intercalate "," $ map showSingleSet cols
+    show s `mappend` " = " `mappend` show a
+  showSet (Just cols) = intercalate "," $ fmap showSingleSet cols
 
   showInsertCols Nothing = ""
   showInsertCols (Just cols) =
-    " (" ++
-      intercalate ", " (map (show.SequelColumn) cols) ++
+    " (" `mappend`
+      intercalate ", " (fmap (show.SequelColumn) cols) `mappend`
     ")"
 
   showLimit Nothing = ""
-  showLimit (Just (a,0)) = " LIMIT " ++ show a
-  showLimit (Just (a,b)) = " LIMIT " ++ show a ++ " OFFSET " ++ show b
+  showLimit (Just (a,0)) = " LIMIT " `mappend` show a
+  showLimit (Just (a,b)) = " LIMIT " `mappend` show a `mappend` " OFFSET " `mappend` show b
 
   showSimpleLimit Nothing = ""
-  showSimpleLimit (Just (a, _)) = " LIMIT " ++ show a
+  showSimpleLimit (Just (a, _)) = " LIMIT " `mappend` show a
 
   showVals (Just cols) =
     intercalate ", " $
-      map (\ row ->
-        "(" ++
-        intercalate ", " (map show row) ++
+      fmap (\ row ->
+        "(" `mappend`
+        intercalate ", " (fmap show row) `mappend`
         ")"
       )
       cols
 
-  showUpsert False _ = ""
-  showUpsert True (Just fields) = "ON DUPLICATE KEY UPDATE " ++ intercalate "," (map showUpdateValue fields)
+  showUpsert SequelUpsertEmpty _ _ = ""
+  showUpsert (SequelUpsertKey k) (Just fields) (SequelTable (SequelSymbol tbname)) = "ON CONFLICT ON CONSTRAINT " `mappend`
+                                                                                      show k `mappend`
+                                                                                      " DO UPDATE SET" `mappend` intercalate "," (fmap showUpdateValue fields)
+  showUpsert (SequelUpsertField k) (Just fields) (SequelTable (SequelSymbol tbname)) = "ON CONFLICT (" `mappend`
+                                                                                      show k `mappend`
+                                                                                      ") DO UPDATE SET" `mappend` intercalate ", " (fmap showUpdateValue fields)
+  showUpsert SequelUpsertAuto (Just fields) _ = " ON DUPLICATE KEY UPDATE " `mappend`  intercalate ", " ( fmap ( \f -> show f  `mappend` "=VALUES(" `mappend` show f `mappend` ")" ) fields)
 
-  showUpdateValue field = show field ++ " = VALUES(" ++ show field ++ ")"
+  showUpdateValue field = show field `mappend` " = EXCLUDED." `mappend` show field
+
+
+  plainQuery = PlainQuery
 
   showQuery (SequelQuery SELECT cols table _ cond order groupBy having lim _) =
-    "SELECT " ++
-    showCols cols ++
-    " FROM " ++
-    show table ++
-    showCond cond ++
-    showOrder order ++
-    showGroup groupBy ++
-    showHaving having ++
+    "SELECT " `mappend`
+    showCols cols `mappend`
+    " FROM " `mappend`
+    show table `mappend`
+    showCond cond `mappend`
+    showOrder order `mappend`
+    showGroup groupBy `mappend`
+    showHaving having `mappend`
     showLimit lim
 
+  showQuery (PlainQuery s) = s
+
   showQuery (SequelQuery UPDATE cols table _ cond _ _ _ lim _) =
-    "UPDATE " ++
-    show table ++
-    " SET " ++
-    showSet cols ++
-    showCond cond ++
+    "UPDATE " `mappend`
+    show table `mappend`
+    " SET " `mappend`
+    showSet cols `mappend`
+    showCond cond `mappend`
     showSimpleLimit lim
 
 
+
   showQuery (SequelQuery INSERT cols table vals _ _ _ _ _ upsert) =
-    "INSERT INTO " ++
-    show table ++
-    showInsertCols cols ++
-    " VALUES " ++
-    showVals vals ++
-    showUpsert upsert cols
+    "INSERT INTO " `mappend`
+    show table `mappend`
+    showInsertCols cols `mappend`
+    " VALUES " `mappend`
+    showVals vals `mappend`
+    showUpsert upsert cols table
 
 
   showQuery (SequelQuery DELETE _ table _ cond _ _ _ lim _) =
-    "DELETE FROM " ++
-    show table ++
-    showCond cond ++
+    "DELETE FROM " `mappend`
+    show table `mappend`
+    showCond cond `mappend`
     showSimpleLimit lim
 
   instance Show SequelQuery where
     show = showQuery
 
   t s@(SequelSymbol _) = SequelTable s
+  t s@SequelSymbolOperation{} = SequelTable s
   ts = SequelTable . SequelSymbol
   s = SequelSymbol
-  nd = SequelNumber
-  ni = SequelIntegral
-  b = SequelBool
-  v s = SequelString $ show s
   don'tEscape = SequelString
   f = SequelFunctor
-  now = f NOW []
   currentTimestamp = CurrentTimeStamp
+
+  vdef = SequelDefault
+
+  class SequelValue a where
+    v :: a -> SequelExpression
+
+  instance SequelValue T.Text where
+     v s = SequelString escaped
+      where
+        s' =  T.unpack . escapeText $ s
+        escaped = "'" `mappend` s' `mappend` "'"
+
+  instance SequelValue TL.Text where
+     v s = SequelString escaped
+      where
+        s' =  TL.unpack . escapeTextLazy $ s
+        escaped = "'" `mappend` s' `mappend` "'"
+
+  instance SequelValue BS.ByteString where
+     v s = SequelString escaped
+      where
+        s' = BS.unpack . escapeByteString $ s
+        escaped = "'" `mappend` s' `mappend` "'"
+
+  instance SequelValue String where
+    v s = SequelString escaped
+      where
+        s' = escapeString s
+        escaped = quoteString:s' `mappend` [quoteString]
+
+  instance SequelValue Int where
+    v = SequelIntegral
+
+  instance SequelValue Double where
+    v = SequelNumber
+
+  instance SequelValue Bool where
+    v = SequelBool
+
+  escapeString s = s
+
+  escapeText s =
+    let s' = T.replace "\\" "\\\\" s
+    in T.replace "'" "\\'" s'
+
+  escapeTextLazy s =
+    let s' = TL.replace "\\" "\\\\" s
+    in TL.replace "'" "\\'" s'
+
+  escapeByteString s = s
+    --let s' = BS.replace $ s "\\" "\\\\"
+    --in BS.replace s' "'" "\\'"
