@@ -1,12 +1,12 @@
-{-# LANGUAGE FlexibleContexts 
+{-# LANGUAGE FlexibleContexts
            , UndecidableSuperClasses #-}
 module MiniSequel.Mapper
 where
   import MiniSequel
   import MiniSequel.Expression ((=.), SequelExpression)
-  
+
   import Database.HDBC
-  
+
   import Data.Data
   import Data.Char (toUpper, toLower, isUpper)
   import Data.Maybe (fromJust)
@@ -26,12 +26,12 @@ where
     createMulti :: [a] -> SequelQuery
     createMulti a = query
       where
-        fields = fromJust . _colums . create . head $ a 
-        vals = map (head . fromJust . _values . create) a 
-        query = insert fields $ 
-                values vals $ 
-                into table_name
-        table_name = _from . create . head $ a
+        fields = fromJust . _colums . create . head $ a
+        vals = map (head . fromJust . _values . create) a
+        query = makeQuery tableName $ do
+              insert fields
+              values vals
+        tableName = _from . create . head $ a
 
 
   snakeCase :: String -> String
@@ -60,8 +60,9 @@ where
       where
         key:fields = map (s.snakeCase) $ constrFields . toConstr $ a
         id : vals = sequelValues a
-        query = update set_fields $
-                where' (key =. id) $
-                from table_name
+        query = undefined
+          --  update set_fields $
+          --       where' (key =. id) $
+          --       from table_name
         table_name = ts $ snakeCase  $ show $ toConstr a
         set_fields = zipWith (=.) fields vals
