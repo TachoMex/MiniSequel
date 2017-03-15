@@ -1,6 +1,6 @@
-module MiniSequel.Adapter.PostgreSQL.Log
+module MiniSequel.Adapter.MySQL.Log
 where
-  import qualified MiniSequel.Adapter.PostgreSQL as Adapter
+  import qualified MiniSequel.Adapter.MySQL as Adapter
 
   exec con query = do
     print query
