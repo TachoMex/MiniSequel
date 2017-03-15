@@ -10,6 +10,7 @@ where
   import qualified Data.Text.Lazy as TL
   import qualified Data.ByteString.Char8 as BS
   import qualified Data.ByteString.Search as BS
+  import Control.Monad.State
 
   import MiniSequel.Expression
 
@@ -66,57 +67,61 @@ where
     _upsert = SequelUpsertEmpty
   }
 
-  select :: [SequelExpression] -> SequelQuery -> SequelQuery
-  select fields query =
-    query {_queryType = SELECT, _colums = Just fields}
+  select :: [SequelExpression] ->  State SequelQuery ()
+  select fields = modify $ \ query -> query {_queryType = SELECT, _colums = Just fields}
 
-  where' :: SequelExpression -> SequelQuery -> SequelQuery
-  where' cond query
-    | isNothing $ _where query = query {_where = Just cond}
-    | otherwise = query {_where = Just (cond &&. fromJust (_where query))}
+  where' :: SequelExpression -> State SequelQuery ()
+  where' cond = do
+    query <- get
+    put $ result query
+    where
+      result query
+        | isNothing $ _where query = query {_where = Just cond}
+        | otherwise = query {_where = Just (cond &&. fromJust (_where query))}
 
   empty = select [v (1 :: Int)]
 
-  update :: [SequelExpression] -> SequelQuery -> SequelQuery
-  update fields query =
-    query {_queryType = UPDATE, _colums = Just fields}
+  update :: [SequelExpression] -> State SequelQuery ()
+  update fields = modify $ \ query -> query {_queryType = UPDATE, _colums = Just fields}
 
-  insert :: [SequelExpression] -> SequelQuery -> SequelQuery
-  insert cols query =
-    query {_queryType = INSERT, _colums = Just cols}
+  insert :: [SequelExpression] -> State SequelQuery ()
+  insert cols = modify $ \ query -> query {_queryType = INSERT, _colums = Just cols}
 
-  values ::[[SequelExpression]] -> SequelQuery -> SequelQuery
-  values vals query =
-    query {_values = Just vals, _queryType =  INSERT }
+  values ::[[SequelExpression]] -> State SequelQuery ()
+  values vals = modify $ \ query -> query {_values = Just vals, _queryType =  INSERT }
 
   into = from
 
-  delete :: SequelQuery -> SequelQuery
-  delete query = query {_queryType = DELETE}
+  delete :: State SequelQuery ()
+  delete = modify $ \ query -> query {_queryType = DELETE}
 
-  orderBy :: [SequelOrder] -> SequelQuery -> SequelQuery
-  orderBy criteria query =
-    query {_order = Just criteria}
+  orderBy :: [SequelOrder] -> State SequelQuery ()
+  orderBy criteria = modify $ \ query -> query {_order = Just criteria}
 
-  groupBy :: [SequelExpression] -> SequelQuery -> SequelQuery
-  groupBy criteria query =
-    query {_group = Just criteria}
+  groupBy :: [SequelExpression] -> State SequelQuery ()
+  groupBy criteria = modify $ \ query -> query {_group = Just criteria}
 
-  having :: SequelExpression -> SequelQuery -> SequelQuery
-  having cond query =
-    query {_having = Just cond}
+  having :: SequelExpression -> State SequelQuery ()
+  having cond = modify $ \ query -> query {_having = Just cond}
 
-  join :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
+  applyJoin :: SequelJoinType -> SequelTable -> SequelExpression -> State SequelQuery ()
+  applyJoin type' table cond = do
+      query <- get
+      let tbl = _from query
+      put $ query { _from = SequelJoin tbl table type' cond }
+
+
   join = innerJoin
 
-  innerJoin :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
-  innerJoin a b = SequelJoin a b INNER
+  innerJoin :: SequelTable -> SequelExpression -> State SequelQuery ()
+  innerJoin = applyJoin INNER
 
-  rightJoin :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
-  rightJoin a b = SequelJoin a b RIGHT
+  rightJoin :: SequelTable -> SequelExpression -> State SequelQuery ()
+  rightJoin = applyJoin RIGHT
 
-  leftJoin :: SequelTable -> SequelTable -> SequelExpression -> SequelTable
-  leftJoin a b = SequelJoin a b LEFT
+  leftJoin :: SequelTable -> SequelExpression -> State SequelQuery ()
+  leftJoin = applyJoin LEFT
+
 
   on :: SequelExpression -> SequelExpression
   on = SequelOn
@@ -124,18 +129,28 @@ where
   using :: [SequelExpression] -> SequelExpression
   using = SequelUsing
 
-  limit :: Int -> SequelQuery -> SequelQuery
-  limit lim query
-    | isNothing $ _limit query = query { _limit = Just (lim, 0) }
-    | otherwise = query { _limit = Just (lim, offset') }
-      where (_, offset') = fromJust $ _limit query
+  limit :: Int -> State SequelQuery ()
+  limit lim = modify limit'
+    where
+      limit' query
+        | isNothing $ _limit query = query { _limit = Just (lim, 0) }
+        | otherwise = query { _limit = Just (lim, offset') }
+        where
+          (_, offset') = fromJust $ _limit query
 
-  offset :: Int -> SequelQuery -> SequelQuery
-  offset offset' query
-    | isNothing $ _limit query = query { _limit = Just (1, offset')}
-    | otherwise = query { _limit = Just (lim, offset') }
-      where (lim, _) = fromJust $ _limit query
-  first :: SequelQuery -> SequelQuery
+  offset :: Int -> State SequelQuery ()
+  offset off = modify func
+    where
+      func query
+        | isNothing $ _limit query = query { _limit = Just (1, off )}
+        | otherwise = query { _limit = Just (lim, off) }
+          where (lim, _) = fromJust $ _limit query
+
+  makeQuery t query = q
+    where
+      ((), q) = runState query (from t)
+
+  first :: State SequelQuery ()
   first = limit 1
 
   onDuplicateKeyUpdate query = query { _upsert = SequelUpsertAuto }
@@ -236,18 +251,23 @@ where
     showCond cond `mappend`
     showSimpleLimit lim
 
-  instance Show SequelQuery where
-    show = showQuery
 
   t s@(SequelSymbol _) = SequelTable s
   t s@SequelSymbolOperation{} = SequelTable s
   ts = SequelTable . SequelSymbol
   s = SequelSymbol
+  {-# ANN module ("HLint: ignore Use camelCase" :: String) #-}
   don'tEscape = SequelString
   f = SequelFunctor
   currentTimestamp = CurrentTimeStamp
 
   vdef = SequelDefault
+
+  vi :: Int -> SequelExpression
+  vi = v
+
+  vf :: Double -> SequelExpression
+  vf = v
 
   class SequelValue a where
     v :: a -> SequelExpression

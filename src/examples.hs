@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric, FlexibleContexts #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
@@ -10,7 +9,7 @@ import MiniSequel
 import MiniSequel.Expression
 import MiniSequel.Model
 import MiniSequel.Mapper
-import MiniSequel.Adapter
+import MiniSequel.Adapter.MySQL (exec, takeModel)
 import Data.ByteString.Char8 (ByteString, unpack)
 import Database.HDBC.MySQL
 import Database.HDBC.Types
@@ -23,57 +22,65 @@ age = s "age"
 id' = s "id"
 
 
-sampleSelect =
-  select [users ~> name', age, age *. ni 3 =: s"3_ages"] $
-  where' (users ~> name' =. v"somebody" &&. age >=. ni 18) $
-  from $ t users
+sampleTable = from $ t users
 
-sampleUpdate =
-  update [users ~> name' =. v"tacho", age =. ni 22] $
-  where' (users ~> name' =. v"somebody" &&. age >=. ni 18) $
-  from $ t users
+sampleSelect = makeQuery (t users) $ do
+  select [users ~> name', age, age *. vi 3 =: s"3_ages"]
+  where' (users ~> name' =. v"somebody" &&. age >=. vi 18)
 
-sampleOrder =
-  select [users ~> name', age, age *. ni 3 =: s"3_agees"] $
-  where' (users ~> name' =. v"somebody" &&. age >=. ni 18) $
-  orderBy [Asc name', Desc (age >=. ni 18), Asc (f LENGTH [age])] $
-  from $ t users
+sampleUpdate = makeQuery (t users) $ do
+  update [users ~> name' =. v"tacho", age =. v (22 :: Int)]
+  where' (users ~> name' =. v"somebody" &&. age >=. v (18 :: Int))
 
-sampleInsert =
-  insert [id', name', age] $
+sampleOrder = makeQuery (t users) $ do
+  select [users ~> name', age, age *. vi 3 =: s"3_agees"]
+  where' (users ~> name' =. v"somebody" &&. age >=. vi 18)
+  orderBy [Asc name', Desc (age >=. vi 18), Asc (f LENGTH [age])]
+
+
+sampleInsert = makeQuery (t users) $ do
+  insert [id', name', age]
   values [
-    [SequelNull, v"alice", ni 22],
-    [SequelNull, v"bob", ni 21],
-    [SequelNull, v"cheryl", ni 22]
-    ] $
-  into $ t users
+    [SequelNull, v"alice", vi 22],
+    [SequelNull, v"bob", vi 21],
+    [SequelNull, v"cheryl", vi 22]
+    ]
 
 
-sampleDelete =
-  delete $
-  where' (s"name" =. v"tacho") $
-  from (ts "users")
+sampleDelete = makeQuery (t users) $ do
+  delete
+  where' (s"name" =. v"tacho")
 
-fullTest =
-  select [name', age, user', register_date, f MAX [salary] =: salary] $
-  where' (f YEAR [register_date] >. v"2015-12-31") $
-  groupBy [name'] $
-  orderBy [Desc salary] $
-  having (salary >. ni 10000) $
-  from $ t employee
+fullTest = makeQuery (t users) $ do
+  select [name', age, user', register_date, f MAX [salary] =: salary]
+  where' (f YEAR [register_date] >. v"2015-12-31")
+  groupBy [name']
+  orderBy [Desc salary]
+  having (salary >. vf 10000)
     where
       register_date = s "register_date"
       salary        = s "salary"
       employee      = s "employee"
 
-sampleJoin = ""
+sampleJoin = makeQuery (t users) $ do
+  select [name, age, contents, date]
+  where' $ name =. v "tacho"
+  innerJoin (t messages) $ using [userId]
+  limit 1
+  offset 1
+  where
+    name = s "name"
+    contents = s "contents"
+    date = s "date"
+    messages = s "messages"
+    userId = s "user_id"
 
 data UserModel = UserModel {
   userId :: Int,
-  name :: ByteString,
-  username :: ByteString,
-  email :: ByteString,
-  password :: ByteString
+  name :: String,
+  username :: String,
+  email :: String,
+  password :: String
 } deriving (Show
           , Typeable
           , G.Generic
@@ -83,9 +90,9 @@ instance  SOP.Generic UserModel
 
 instance SequelModel UserModel where
   createModel = table (s"user") [
-    primaryKey $ autoIncrement $ notNull $ column (s"user_id")        SequelInteger,
+    primaryKey . autoIncrement . notNull $ column (s"user_id")        SequelInteger,
                                  notNull $ column (s"name")          (SequelVarchar 50),
-                        unique $ notNull $ column (s"username")      (SequelVarchar 30),
+                        unique . notNull $ column (s"username")      (SequelVarchar 30),
                                  notNull $ column (s"email")         (SequelVarchar 60),
                                  notNull $ column (s"password")      (SequelVarchar 1050)]
 
@@ -98,12 +105,18 @@ instance SequelMapper UserModel where
       password = fromSql $ row !! 4
     }
 
+  create u = makeQuery (ts "users") $ do
+    insert [s"name", s"username", s"email", s"password"]
+    values [[v $ name u, v $ username u, v $ email u, v $ password u]]
 
-findByUserId :: (IConnection a) => a -> String -> IO UserModel
-findByUserId con user = do
-  let query = first $ where' (s"username" =. v user) $ from $ ts "user"
-  result <- exec con query
-  return $ fromSqlRow $ head result :: IO UserModel
+
+
+
+-- findByUserId :: (IConnection a) => a -> String -> IO UserModel
+-- findByUserId con user = do
+--   let query = first . where' (s"username" =. v user) $ from $ ts "user"
+--   result <- exec con query
+--   return $ fromSqlRow $ head result :: IO UserModel
 
 main = do
   print sampleSelect
@@ -116,8 +129,7 @@ main = do
   print (createModel :: Model UserModel)
   print $ create you
   print $ createMulti [you, you, you]
-  print $ store you
-  print (fromSqlRow [SqlInt32 10, SqlByteString "ImAUser", SqlByteString "ProUser", SqlByteString "mail@mail.com", SqlByteString "p4ssvv0rd"] :: UserModel)
+  print (fromSqlRow [toSql (10 :: Int), toSql "ImAUser", toSql "ProUser", toSql "mail@mail.com", toSql "p4ssvv0rd"] :: UserModel)
   where
     you = UserModel {
       userId = 8,

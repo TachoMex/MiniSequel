@@ -53,7 +53,10 @@ library
   -- Modules exported by the library.
   exposed-modules:         MiniSequel
                            MiniSequel.Adapter,
-                           MiniSequel.Adapter.Log,
+                           MiniSequel.Adapter.MySQL.Log,
+                           MiniSequel.Adapter.MySQL,
+                           MiniSequel.Adapter.PostgreSQL.Log,
+                           MiniSequel.Adapter.PostgreSQL,
                            MiniSequel.Expression,
                            MiniSequel.Migration,
                            MiniSequel.Mapper,
@@ -75,7 +78,8 @@ library
                        cases,
                        text,
                        bytestring,
-                       stringsearch
+                       stringsearch,
+                       mtl
 
   -- Directories containing source files.
   hs-source-dirs:      src
