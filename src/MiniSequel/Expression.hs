@@ -1,5 +1,6 @@
 module MiniSequel.Expression where
   import Data.List (intercalate)
+  import Data.List.Utils (join, split)
 
   data SequelBooleanOperator =
     BooleanOr |
@@ -145,12 +146,12 @@ module MiniSequel.Expression where
   (**.) a@SequelNumericOperation{} b@SequelNumericOperation{} = SequelFunctor POWER [a,b]
   (**.) a@(SequelNumber _) b@SequelNumericOperation{} = SequelFunctor POWER [a,b]
   (**.) a@SequelNumericOperation{} b@(SequelNumber _) = SequelFunctor POWER [a,b]
-  (**.) a b = error $ "Unknown operatrion for (**) with:\n" `mappend` show a `mappend` "\n" `mappend` show b
+  (**.) a b = error $ "Unknown operatrion for (**) with:\n" `mappend` showExpr '`' '\'' a `mappend` "\n" `mappend` showExpr '`' '\'' b
 
   infix 9 ~>    -- column accessor
   (~>) :: SequelExpression -> SequelExpression -> SequelExpression
   (~>) a@(SequelSymbol _) b@(SequelSymbol _) = SequelSymbolOperation Access a b
-  (~>) a b = error $ "Unknown operatrion for (~>) with:\n"`mappend`show a `mappend`"\n"`mappend` show b
+  (~>) a b = error $ "Unknown operatrion for (~>) with:\n"`mappend` showExpr '`' '\'' a `mappend` "\n" `mappend` showExpr '`' '\'' b
 
   infixl 6 =:=   -- string concatenation
   (=:=) :: SequelExpression -> SequelExpression -> SequelExpression
@@ -160,33 +161,32 @@ module MiniSequel.Expression where
   (=:) :: SequelExpression -> SequelExpression -> SequelExpression
   (=:) a s@(SequelSymbol _) = SequelSymbolOperation As a s
 
-  quoteIdentifier = '`'
-  quoteString = '\''
-
-  instance Show SequelExpression where
-    show (SequelBool True) = "true"
-    show (SequelBool False) = "false"
-    show (SequelString s) = s
-    show (SequelNumber n) = show n
-    show (SequelIntegral i) = show i
-    show (SequelSymbol s) = quoteIdentifier:s `mappend` [quoteIdentifier]
-    show (SequelSymbolOperation s a b) = show a `mappend` show s `mappend` show b
-    show (SequelBoolOperation s a b) = "("`mappend`show a `mappend` show s `mappend` show b`mappend`")"
-    show (SequelStringOperation s a b) = "("`mappend`show a `mappend` show s `mappend` show b`mappend`")"
-    show (SequelNumericOperation s a b) = "("`mappend`show a `mappend` show s `mappend` show b`mappend`")"
-    show (SequelRelationalOperation s a b) = "("`mappend`show a `mappend` show s `mappend` show b`mappend`")"
-    show SequelNull = "NULL"
-    show SequelDefault = "DEFAULT"
-    show CurrentTimeStamp = "CURRENT_TIMESTAMP"
-    show (SequelOn exp) = "ON " `mappend` show exp
-    show (SequelUsing fields) = "USING (" `mappend` fs `mappend`")"
-      where
-       fs = intercalate ", " $ fmap show fields
-    show (SequelFunctor func params) =
-      show func `mappend`
-      "(" `mappend`
-      intercalate ", " (fmap show params) `mappend`
-      ")"
+  showExpr :: Char -> Char -> SequelExpression -> String
+  showExpr _ _ (SequelBool True) = "true"
+  showExpr _ _ (SequelBool False) = "false"
+  showExpr _ qs (SequelString s) = qs:escaped `mappend` [qs]
+    where
+      escaped = join ['\'', qs] . split [qs] . join "\\" . split "\"" $ s
+  showExpr _ _ (SequelNumber n) = show n
+  showExpr _ _ (SequelIntegral i) = show i
+  showExpr quoteIdentifier _ (SequelSymbol s) = quoteIdentifier:s `mappend` [quoteIdentifier]
+  showExpr qi qs (SequelSymbolOperation s a b) = showExpr qi qs a `mappend` show s `mappend` showExpr qi qs b
+  showExpr qi qs (SequelBoolOperation s a b) = "(" `mappend` showExpr qi qs a `mappend` show s `mappend` showExpr qi qs b `mappend` ")"
+  showExpr qi qs (SequelStringOperation s a b) = "(" `mappend` showExpr qi qs a `mappend` show s `mappend` showExpr qi qs b `mappend` ")"
+  showExpr qi qs (SequelNumericOperation s a b) = "(" `mappend` showExpr qi qs a `mappend` show s `mappend` showExpr qi qs b`mappend` ")"
+  showExpr qi qs (SequelRelationalOperation s a b) = "(" `mappend` showExpr qi qs a `mappend` show s `mappend` showExpr qi qs b `mappend` ")"
+  showExpr _ _ SequelNull = "NULL"
+  showExpr _ _ SequelDefault = "DEFAULT"
+  showExpr _ _ CurrentTimeStamp = "CURRENT_TIMESTAMP"
+  showExpr qi qs (SequelOn exp) = "ON " `mappend` showExpr qi qs exp
+  showExpr qi qs (SequelUsing fields) = "USING (" `mappend` fs `mappend` ")"
+    where
+     fs = intercalate ", " $ fmap (showExpr qi qs ) fields
+  showExpr qi qs (SequelFunctor func params) =
+    show func `mappend`
+    "(" `mappend`
+    intercalate ", " (fmap (showExpr qi qs) params) `mappend`
+    ")"
 
   instance Show SequelNumberOperator where
     show Add = " + "
@@ -234,7 +234,7 @@ module MiniSequel.Expression where
 
   applyFunction construct op a b
     | isValue a && isValue b = construct op a b
-    | otherwise = error $ "Unknown operation for " `mappend` show op `mappend` " with:\n" `mappend` show a `mappend` "\n" `mappend` show b
+    | otherwise = error $ "Unknown operation for " `mappend` show op `mappend` " with:\n" `mappend` showExpr '`' '\'' a `mappend` "\n" `mappend` showExpr '`' '\'' b
 
 
 
@@ -249,4 +249,4 @@ module MiniSequel.Expression where
   applyBooleanFunctor op a@SequelBoolOperation{} b@SequelRelationalOperation{} = SequelBoolOperation op a b
   applyBooleanFunctor op a@SequelRelationalOperation{} b@SequelBoolOperation{} = SequelBoolOperation op a b
   applyBooleanFunctor op a@SequelBoolOperation{} b@SequelBoolOperation{} = SequelBoolOperation op a b
-  applyBooleanFunctor op a b = error $ "Unknown operation for "`mappend`show op`mappend`" with:\n"`mappend`show a `mappend`"\n"`mappend` show b
+  applyBooleanFunctor op a b = error $ "Unknown operation for " `mappend` show op `mappend` " with:\n" `mappend` showExpr '`' '\'' a `mappend` "\n"`mappend` showExpr '`' '\'' b

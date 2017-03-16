@@ -8,7 +8,10 @@ module MiniSequel.Adapter.MySQL
 
 
     instance Show SequelQuery where
-      show = showQuery
+      show = showQuery '`' '\''
+
+    instance (Show a) => Show (Model a) where
+      show = showModel '`' '\''
 
 
     exec :: (IConnection c) => c -> SequelQuery -> IO [[SqlValue]]
@@ -19,5 +22,5 @@ module MiniSequel.Adapter.MySQL
           result <- run con (show query) []
           return [[toSql result]]
 
-    takeModel :: (IConnection c) => c -> Model b -> IO Integer
+    takeModel :: (IConnection c, Show b) => c -> Model b -> IO Integer
     takeModel con model = run con (show model) []

@@ -79,7 +79,8 @@ library
                        text,
                        bytestring,
                        stringsearch,
-                       mtl
+                       mtl,
+                       MissingH
 
   -- Directories containing source files.
   hs-source-dirs:      src

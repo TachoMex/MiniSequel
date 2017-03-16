@@ -41,16 +41,16 @@ where
   data SequelJoinType = INNER | LEFT | RIGHT deriving (Show)
 
 
-  instance Show SequelTable where
-    show (SequelTable s) = show s
-    show (SequelJoin a b t expr) = "(" `mappend` show a `mappend` " " `mappend` show t `mappend` " JOIN " `mappend` show b `mappend` show expr `mappend` ")"
+  showTable qi (SequelTable s) = showExpr qi ' ' s
+  showTable qi (SequelJoin a b t expr) = "(" `mappend` showTable qi a `mappend` " "
+                                             `mappend` show t `mappend` " JOIN "
+                                             `mappend` showTable qi b `mappend`
+                                             showExpr qi ' ' expr `mappend` ")"
 
-  instance Show SequelOrder where
-    show (Asc exp) = show exp `mappend` " ASC"
-    show (Desc exp) = show exp `mappend` " DESC"
+  showOrd qi qs (Asc exp) = showExpr qi qs exp `mappend` " ASC"
+  showOrd qi qs (Desc exp) = showExpr qi qs exp `mappend` " DESC"
 
-  instance Show SequelColumn where
-    show (SequelColumn s@(SequelSymbol _)) = show s
+  showCol qi qs (SequelColumn s@(SequelSymbol _)) = showExpr qi qs s
 
 
   from :: SequelTable -> SequelQuery
@@ -156,31 +156,32 @@ where
   onDuplicateKeyUpdate query = query { _upsert = SequelUpsertAuto }
   onConflictKeyUpdate s query = query { _upsert = SequelUpsertKey s }
 
-  showCols Nothing = "*"
-  showCols (Just cols) = intercalate "," $ fmap show cols
+  showCols _ _ Nothing = "*"
+  showCols qi qs (Just cols) = intercalate "," $ fmap (showExpr qi qs) cols
 
-  showCond Nothing = ""
-  showCond (Just cond) = " WHERE " `mappend` show cond
+  showCond _ _ Nothing = ""
+  showCond qi qs (Just cond) = " WHERE " `mappend` showExpr qi qs cond
 
-  showOrder Nothing = ""
-  showOrder (Just criteria) = " ORDER BY " `mappend` intercalate ", "  (fmap show criteria)
+  showOrder _ _ Nothing = ""
+  showOrder qi qs (Just criteria) = " ORDER BY " `mappend` intercalate ", "  (fmap (showOrd qi qs) criteria)
 
-  showGroup Nothing = ""
-  showGroup (Just criteria) = " GROUP BY " `mappend` intercalate ", " (fmap show criteria)
+  showGroup _ _ Nothing = ""
+  showGroup qi qs (Just criteria) = " GROUP BY " `mappend` intercalate ", " (fmap (showExpr qi qs) criteria)
 
-  showHaving Nothing = ""
-  showHaving (Just cond) = " HAVING " `mappend` show cond
+  showHaving _ _ Nothing = ""
+  showHaving qi qs (Just cond) = " HAVING " `mappend` showExpr qi qs cond
 
-  showSingleSet (SequelRelationalOperation Equal s@(SequelSymbol _) a) =
-    show s `mappend` " = " `mappend` show a
-  showSingleSet (SequelRelationalOperation Equal s@SequelSymbolOperation{} a) =
-    show s `mappend` " = " `mappend` show a
-  showSet (Just cols) = intercalate "," $ fmap showSingleSet cols
+  showSingleSet qi qs (SequelRelationalOperation Equal s@(SequelSymbol _) a) =
+    showExpr qi qs s `mappend` " = " `mappend` showExpr qi qs a
+  showSingleSet qi qs (SequelRelationalOperation Equal s@SequelSymbolOperation{} a) =
+    showExpr qi qs s `mappend` " = " `mappend` showExpr qi qs a
 
-  showInsertCols Nothing = ""
-  showInsertCols (Just cols) =
+  showSet qi qs (Just cols) = intercalate "," $ fmap (showSingleSet qi qs) cols
+
+  showInsertCols _ _ Nothing = ""
+  showInsertCols qi qs (Just cols) =
     " (" `mappend`
-      intercalate ", " (fmap (show.SequelColumn) cols) `mappend`
+      intercalate ", " (fmap (showCol qi qs . SequelColumn) cols) `mappend`
     ")"
 
   showLimit Nothing = ""
@@ -190,65 +191,64 @@ where
   showSimpleLimit Nothing = ""
   showSimpleLimit (Just (a, _)) = " LIMIT " `mappend` show a
 
-  showVals (Just cols) =
+  showVals qi qs (Just cols) =
     intercalate ", " $
       fmap (\ row ->
         "(" `mappend`
-        intercalate ", " (fmap show row) `mappend`
+        intercalate ", " (fmap (showExpr qi qs) row) `mappend`
         ")"
       )
       cols
 
-  showUpsert SequelUpsertEmpty _ _ = ""
-  showUpsert (SequelUpsertKey k) (Just fields) (SequelTable (SequelSymbol tbname)) = "ON CONFLICT ON CONSTRAINT " `mappend`
-                                                                                      show k `mappend`
-                                                                                      " DO UPDATE SET" `mappend` intercalate "," (fmap showUpdateValue fields)
-  showUpsert (SequelUpsertField k) (Just fields) (SequelTable (SequelSymbol tbname)) = "ON CONFLICT (" `mappend`
-                                                                                      show k `mappend`
-                                                                                      ") DO UPDATE SET" `mappend` intercalate ", " (fmap showUpdateValue fields)
-  showUpsert SequelUpsertAuto (Just fields) _ = " ON DUPLICATE KEY UPDATE " `mappend`  intercalate ", " ( fmap ( \f -> show f  `mappend` "=VALUES(" `mappend` show f `mappend` ")" ) fields)
+  showUpsert _ _  SequelUpsertEmpty _ _ = ""
+  showUpsert qi qs (SequelUpsertKey k) (Just fields) (SequelTable (SequelSymbol tbname)) = "ON CONFLICT ON CONSTRAINT " `mappend`
+                                                                                      showExpr qi qs k `mappend`
+                                                                                      " DO UPDATE SET" `mappend` intercalate "," (fmap (showUpdateValue qi qs) fields)
+  showUpsert qi qs (SequelUpsertField k) (Just fields) (SequelTable (SequelSymbol tbname)) = "ON CONFLICT (" `mappend`
+                                                                                      showExpr qi qs k `mappend`
+                                                                                      ") DO UPDATE SET" `mappend` intercalate ", " (fmap (showUpdateValue qi qs) fields)
+  showUpsert qi qs SequelUpsertAuto (Just fields) _ = " ON DUPLICATE KEY UPDATE " `mappend`  intercalate ", " ( fmap ( \f -> showExpr qi qs f  `mappend` "=VALUES(" `mappend` showExpr qi qs f `mappend` ")" ) fields)
 
-  showUpdateValue field = show field `mappend` " = EXCLUDED." `mappend` show field
+  showUpdateValue qi qs field = showExpr qi qs field `mappend` " = EXCLUDED." `mappend` showExpr qi qs field
 
 
   plainQuery = PlainQuery
 
-  showQuery (SequelQuery SELECT cols table _ cond order groupBy having lim _) =
+  showQuery :: Char -> Char -> SequelQuery -> String
+  showQuery qi qs (SequelQuery SELECT cols table _ cond order groupBy having lim _) =
     "SELECT " `mappend`
-    showCols cols `mappend`
+    showCols qi qs cols `mappend`
     " FROM " `mappend`
-    show table `mappend`
-    showCond cond `mappend`
-    showOrder order `mappend`
-    showGroup groupBy `mappend`
-    showHaving having `mappend`
+    showTable qi table `mappend`
+    showCond qi qs cond `mappend`
+    showOrder qi qs order `mappend`
+    showGroup qi qs groupBy `mappend`
+    showHaving qi qs having `mappend`
     showLimit lim
 
-  showQuery (PlainQuery s) = s
+  showQuery qi qs (PlainQuery s) = s
 
-  showQuery (SequelQuery UPDATE cols table _ cond _ _ _ lim _) =
+  showQuery qi qs (SequelQuery UPDATE cols table _ cond _ _ _ lim _) =
     "UPDATE " `mappend`
-    show table `mappend`
+    showTable qi table `mappend`
     " SET " `mappend`
-    showSet cols `mappend`
-    showCond cond `mappend`
+    showSet qi qs cols `mappend`
+    showCond qi qs cond `mappend`
     showSimpleLimit lim
 
-
-
-  showQuery (SequelQuery INSERT cols table vals _ _ _ _ _ upsert) =
+  showQuery qi qs(SequelQuery INSERT cols table vals _ _ _ _ _ upsert) =
     "INSERT INTO " `mappend`
-    show table `mappend`
-    showInsertCols cols `mappend`
+    showTable qi table `mappend`
+    showInsertCols qi qs cols `mappend`
     " VALUES " `mappend`
-    showVals vals `mappend`
-    showUpsert upsert cols table
+    showVals qi qs vals `mappend`
+    showUpsert qi qs upsert cols table
 
 
-  showQuery (SequelQuery DELETE _ table _ cond _ _ _ lim _) =
+  showQuery qi qs (SequelQuery DELETE _ table _ cond _ _ _ lim _) =
     "DELETE FROM " `mappend`
-    show table `mappend`
-    showCond cond `mappend`
+    showTable qi table `mappend`
+    showCond qi qs cond `mappend`
     showSimpleLimit lim
 
 
@@ -273,28 +273,16 @@ where
     v :: a -> SequelExpression
 
   instance SequelValue T.Text where
-     v s = SequelString escaped
-      where
-        s' =  T.unpack . escapeText $ s
-        escaped = "'" `mappend` s' `mappend` "'"
+     v s = SequelString $ T.unpack s
 
   instance SequelValue TL.Text where
-     v s = SequelString escaped
-      where
-        s' =  TL.unpack . escapeTextLazy $ s
-        escaped = "'" `mappend` s' `mappend` "'"
+     v s = SequelString $ TL.unpack s
 
   instance SequelValue BS.ByteString where
-     v s = SequelString escaped
-      where
-        s' = BS.unpack . escapeByteString $ s
-        escaped = "'" `mappend` s' `mappend` "'"
+     v s = SequelString $ BS.unpack s
 
   instance SequelValue String where
-    v s = SequelString escaped
-      where
-        s' = escapeString s
-        escaped = quoteString:s' `mappend` [quoteString]
+    v = SequelString
 
   instance SequelValue Int where
     v = SequelIntegral
@@ -304,17 +292,3 @@ where
 
   instance SequelValue Bool where
     v = SequelBool
-
-  escapeString s = s
-
-  escapeText s =
-    let s' = T.replace "\\" "\\\\" s
-    in T.replace "'" "\\'" s'
-
-  escapeTextLazy s =
-    let s' = TL.replace "\\" "\\\\" s
-    in TL.replace "'" "\\'" s'
-
-  escapeByteString s = s
-    --let s' = BS.replace $ s "\\" "\\\\"
-    --in BS.replace s' "'" "\\'"

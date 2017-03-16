@@ -86,8 +86,8 @@ where
   showNull True = " NULL "
   showNull False = " NOT NULL "
 
-  showDefault Nothing = ""
-  showDefault (Just val) = " DEFAULT "++show val
+  showDefault _ _ Nothing = ""
+  showDefault qi qs (Just val) = " DEFAULT "`mappend` showExpr qi qs val
 
   showAutoIncrement False = ""
   showAutoIncrement True = " AUTO_INCREMENT "
@@ -95,48 +95,45 @@ where
   showPrimaryKey False = ""
   showPrimaryKey True = " PRIMARY KEY "
 
-  showFields table fields = intercalate ", " $ map (showField table) fields
+  showFields qi qs table fields = intercalate ", " $ fmap (showField qi qs table) fields
+
+  showType _ _ SequelInteger = "INTEGER"
+  showType _ _ SequelFKSerial = "BIGINT(20) UNSIGNED"
+  showType _ _ (SequelVarchar size) = "VARCHAR(" `mappend` show size `mappend` ")"
+  showType _ _ SequelDate = "DATE"
+  showType _ _ SequelDateTime = "DATETIME"
+  showType _ _ SequelTimeStamp = "TIMESTAMP"
+  showType _ _ SequelTime = "TIME"
+  showType _ _ SequelDouble = "DOUBLE"
+  showType _ _ SequelText = "TEXT"
+  showType _ _ SequelSerial = "SERIAL"
+  showType _ _ SequelBoolean = " BOOLEAN"
+  showType qi qs (SequelEnumeration values)= "ENUM(" `mappend`  intercalate "," (fmap (showExpr qi qs) values) `mappend` ")"
 
 
-  instance Show SequelType where
-    show SequelInteger = "INTEGER"
-    show SequelFKSerial = "BIGINT(20) UNSIGNED"
-    show (SequelVarchar size) = "VARCHAR(" ++ show size ++ ")"
-    show SequelDate = "DATE"
-    show SequelDateTime = "DATETIME"
-    show SequelTimeStamp = "TIMESTAMP"
-    show SequelTime = "TIME"
-    show SequelDouble = "DOUBLE"
-    show SequelText = "TEXT"
-    show SequelSerial = "SERIAL"
-    show SequelBoolean = " BOOLEAN"
-    show (SequelEnumeration values)= "ENUM(" ++ ( intercalate "," $ map show values) ++ ")"
-
-
-  instance Show (Model a) where
-    show (Model name@(SequelSymbol _) fields safe) =
-      "CREATE TABLE " ++
-      (if safe then " IF NOT EXISTS " else "") ++
-      show name ++
-      "(" ++
-      showFields name fields ++
+  showModel qi qs (Model name@(SequelSymbol _) fields safe) =
+      "CREATE TABLE " `mappend`
+      (if safe then " IF NOT EXISTS " else "") `mappend`
+      showExpr qi qs name `mappend`
+      "(" `mappend`
+      showFields qi qs name fields `mappend`
       ")"
 
 
-  showField (SequelSymbol tableName) (SequelConstraint SequelCUniqKey fields) = "UNIQUE KEY (" ++ intercalate ", " (map show fields) ++ ")"
-  showField (SequelSymbol tableName) (SequelConstraint SequelCPrimaryKey fields) = "PRIMARY KEY (" ++ intercalate ", " (map show fields) ++ ")"
-  showField (SequelSymbol tableName) (SequelField t name@(SequelSymbol nme) def nul pk ai uni fk) =
-    show name ++
-    " " ++
-    show t ++
-    showNull nul ++
-    showDefault def ++
-    showAutoIncrement ai ++
-    showPrimaryKey pk ++
-    if uni then " UNIQUE " else "" ++
+  showField qi qs (SequelSymbol tableName) (SequelConstraint SequelCUniqKey fields) = "UNIQUE KEY (" `mappend` intercalate ", " (fmap (showExpr qi qs) fields) `mappend` ")"
+  showField qi qs (SequelSymbol tableName) (SequelConstraint SequelCPrimaryKey fields) = "PRIMARY KEY (" `mappend` intercalate ", " (fmap (showExpr qi qs) fields) `mappend` ")"
+  showField qi qs (SequelSymbol tableName) (SequelField t name@(SequelSymbol nme) def nul pk ai uni fk) =
+    showExpr qi qs name `mappend`
+    " " `mappend`
+    showType qi qs t `mappend`
+    showNull nul `mappend`
+    showDefault qi qs def `mappend`
+    showAutoIncrement ai `mappend`
+    showPrimaryKey pk `mappend`
+    if uni then " UNIQUE " else "" `mappend`
     case fk of
       Nothing -> ""
       Just (SequelSymbolOperation Access tabS@(SequelSymbol tab)  colS@(SequelSymbol col)) ->
-        ", CONSTRAINT " ++ show (SequelSymbol $ "fk_" ++ tableName ++ "_" ++ nme) ++
-          " FOREIGN KEY(" ++ show name  ++ ") " ++
-          " REFERENCES " ++ show tabS ++ "(" ++ show colS ++ ")"
+        ", CONSTRAINT " `mappend` showExpr qi qs (SequelSymbol $ "fk_" `mappend` tableName `mappend` "_" `mappend` nme) `mappend`
+          " FOREIGN KEY(" `mappend` showExpr qi qs name `mappend` ") " `mappend`
+          " REFERENCES " `mappend` showExpr qi qs tabS `mappend` "(" `mappend` showExpr qi qs colS `mappend` ")"

@@ -9,7 +9,7 @@ import MiniSequel
 import MiniSequel.Expression
 import MiniSequel.Model
 import MiniSequel.Mapper
-import MiniSequel.Adapter.MySQL (exec, takeModel)
+import MiniSequel.Adapter.PostgreSQL (exec, takeModel)
 import Data.ByteString.Char8 (ByteString, unpack)
 import Database.HDBC.MySQL
 import Database.HDBC.Types
