@@ -14,6 +14,7 @@ where
 
   import MiniSequel.Expression
 
+  type Query = State SequelQuery ()
 
   data SequelQuery = SequelQuery {
     _queryType :: SequelQueryType,
@@ -67,10 +68,10 @@ where
     _upsert = SequelUpsertEmpty
   }
 
-  select :: [SequelExpression] ->  State SequelQuery ()
+  select :: [SequelExpression] ->  Query
   select fields = modify $ \ query -> query {_queryType = SELECT, _colums = Just fields}
 
-  where' :: SequelExpression -> State SequelQuery ()
+  where' :: SequelExpression -> Query
   where' cond = do
     query <- get
     put $ result query
@@ -81,30 +82,30 @@ where
 
   empty = select [v (1 :: Int)]
 
-  update :: [SequelExpression] -> State SequelQuery ()
+  update :: [SequelExpression] -> Query
   update fields = modify $ \ query -> query {_queryType = UPDATE, _colums = Just fields}
 
-  insert :: [SequelExpression] -> State SequelQuery ()
+  insert :: [SequelExpression] -> Query
   insert cols = modify $ \ query -> query {_queryType = INSERT, _colums = Just cols}
 
-  values ::[[SequelExpression]] -> State SequelQuery ()
+  values ::[[SequelExpression]] -> Query
   values vals = modify $ \ query -> query {_values = Just vals, _queryType =  INSERT }
 
   into = from
 
-  delete :: State SequelQuery ()
+  delete :: Query
   delete = modify $ \ query -> query {_queryType = DELETE}
 
-  orderBy :: [SequelOrder] -> State SequelQuery ()
+  orderBy :: [SequelOrder] -> Query
   orderBy criteria = modify $ \ query -> query {_order = Just criteria}
 
-  groupBy :: [SequelExpression] -> State SequelQuery ()
+  groupBy :: [SequelExpression] -> Query
   groupBy criteria = modify $ \ query -> query {_group = Just criteria}
 
-  having :: SequelExpression -> State SequelQuery ()
+  having :: SequelExpression -> Query
   having cond = modify $ \ query -> query {_having = Just cond}
 
-  applyJoin :: SequelJoinType -> SequelTable -> SequelExpression -> State SequelQuery ()
+  applyJoin :: SequelJoinType -> SequelTable -> SequelExpression -> Query
   applyJoin type' table cond = do
       query <- get
       let tbl = _from query
@@ -113,13 +114,13 @@ where
 
   join = innerJoin
 
-  innerJoin :: SequelTable -> SequelExpression -> State SequelQuery ()
+  innerJoin :: SequelTable -> SequelExpression -> Query
   innerJoin = applyJoin INNER
 
-  rightJoin :: SequelTable -> SequelExpression -> State SequelQuery ()
+  rightJoin :: SequelTable -> SequelExpression -> Query
   rightJoin = applyJoin RIGHT
 
-  leftJoin :: SequelTable -> SequelExpression -> State SequelQuery ()
+  leftJoin :: SequelTable -> SequelExpression -> Query
   leftJoin = applyJoin LEFT
 
 
@@ -129,7 +130,7 @@ where
   using :: [SequelExpression] -> SequelExpression
   using = SequelUsing
 
-  limit :: Int -> State SequelQuery ()
+  limit :: Int -> Query
   limit lim = modify limit'
     where
       limit' query
@@ -138,7 +139,7 @@ where
         where
           (_, offset') = fromJust $ _limit query
 
-  offset :: Int -> State SequelQuery ()
+  offset :: Int -> Query
   offset off = modify func
     where
       func query
@@ -150,7 +151,7 @@ where
     where
       ((), q) = runState query (from t)
 
-  first :: State SequelQuery ()
+  first :: Query
   first = limit 1
 
   onDuplicateKeyUpdate query = query { _upsert = SequelUpsertAuto }
