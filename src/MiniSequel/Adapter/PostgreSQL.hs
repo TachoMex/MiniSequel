@@ -13,14 +13,8 @@ module MiniSequel.Adapter.PostgreSQL
     instance (Show a) => Show (Model a) where
       show = showModel '"' '\''
 
+    showM :: (Show a) => Model a -> String
+    showM = show
 
-    exec :: (IConnection c) => c -> SequelQuery -> IO [[SqlValue]]
-    exec con query
-      | _queryType query == SELECT = quickQuery' con (show query) []
-      | otherwise =
-        do
-          result <- run con (show query) []
-          return [[toSql result]]
-
-    takeModel :: (IConnection c, Show b) => c -> Model b -> IO Integer
-    takeModel con model = run con (show model) []
+    showQ :: SequelQuery -> String
+    showQ = show
