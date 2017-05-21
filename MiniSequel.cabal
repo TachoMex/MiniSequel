@@ -53,6 +53,7 @@ library
   -- Modules exported by the library.
   exposed-modules:         MiniSequel
                            MiniSequel.Adapter,
+                           MiniSequel.Adapter.ConnectionPool,
                            MiniSequel.Adapter.MySQL.Log,
                            MiniSequel.Adapter.MySQL,
                            MiniSequel.Adapter.PostgreSQL.Log,
@@ -74,6 +75,7 @@ library
                        HDBC,
                        containers,
                        HDBC-mysql,
+                       HDBC-postgresql,
                        generics-sop,
                        cases,
                        text,
