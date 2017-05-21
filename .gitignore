@@ -2,3 +2,6 @@ dist*
 *.hi
 *.o
 .haskell-ghc-mod.json
+.stack-work/*
+src/test
+src/examples
